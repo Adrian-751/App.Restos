@@ -1,0 +1,10 @@
+{
+    "name": "app-restos",
+    "version": "1.0.0",
+    "description": "Sistema de gestión para canchas de fútbol y restaurantes",
+    "private": true,
+    "workspaces": [
+        "client",
+        "server"
+    ]
+}

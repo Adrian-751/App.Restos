@@ -1,0 +1,106 @@
+Frontend:
+🧩 Vite + React o Vue (ultra rápido, modular y productivo)
+🎨 Tailwind CSS (para diseño responsive, limpio y moderno)
+🧠 React Router (para navegación interna)
+💬 Axios o fetch (para consumir APIs)
+🪄 Framer Motion (si querés animaciones fluidas)
+Backend:
+🚀 Node.js + Express (ligero, rápido y ampliamente soportado)
+🗄️ MongoDB o PostgreSQL (dependiendo si preferís algo flexible o relacional)
+🔐 JWT (JSON Web Tokens) para autenticación
+Extras:
+📦 Prisma o Mongoose para manejar la base de datos
+🧰 Zod o Yup para validaciones de formularios
+☁️ Deploy en Render, Vercel o Railway
+
+💡 Idea
+🍽️ Para restaurante
+Menú digital con fotos, precios y descripciones
+Panel de administración (agregar, editar, eliminar productos)
+Sistema de pedidos (para cocina o mozos)
+Modo cliente (ver menú, hacer pedido, pagar)
+Estadísticas de ventas
+
+🎯 Objetivo inicial (MVP)
+Podemos enfocarnos en una versión 1 base con:
+Login de usuario y administrador
+Menú dinámico (desde base de datos)
+Sistema de pedidos
+Dashboard simple con métricas
+
+
+🧱 Estructura base del proyecto
+Usaremos:
+React + Vite ⚡ (por su velocidad y facilidad para desarrollar)
+Tailwind CSS 🎨 (para estilos modernos y responsive)
+React Router 🧭 (para manejar las secciones)
+Context API o Zustand 🧠 (para manejar el estado global, como productos, mesas, pedidos, etc.)
+LocalStorage o IndexedDB 💾 (para persistencia local antes de usar backend)
+Componentes bien modularizados (reutilizables para cada sección)
+
+🌈 Paleta de colores (estilo fucsia con degradados)
+Fucsia principal → #e11d48
+Rosa claro → #f472b6
+Morado oscuro → #4c1d95
+Fondo → #0f172a
+Texto → #f1f5f9
+
+🧩 Secciones (pantallas principales)
+🧠 1. Panel de administración
+Listado de productos con buscador.
+Botones: ➕ Agregar / ✏️ Editar / 🗑️ Eliminar.
+Campos: nombre, precio, stock, categoría, observaciones.
+Opción de modificar precio final manualmente antes de cobrar.
+Todo persistido localmente (o conectado luego a backend).
+🍽️ 2. Sistema de pedidos por mesa
+Vista con todas las mesas en un mapa libre (drag & drop) para ordenarlas.
+Cada mesa: número, nombre, estado (ocupada / libre / reservada).
+Pedidos dentro de cada mesa:
+Agregar / eliminar producto.
+Mostrar total.
+Pagos combinados: efectivo + transferencia (editable y con nombre personalizado).
+Observaciones del pago.
+Botón “Cobrar”.
+👥 3. Clientes
+Listado general (nombre, nro de cliente, cuenta corriente).
+Crear / editar / eliminar cliente.
+Registro de pagos (efvo / transferencia / observaciones).
+Visualización del saldo pendiente.
+
+
+📱 Diseño responsive
+Adaptable a celular, tablet y escritorio.
+Navbar inferior tipo “app móvil”.
+Diseño “card” moderno, con sombras suaves y bordes redondeados.
+
+algarrobos-app/
+├── client/ # Frontend (React + Vite + Tailwind)
+│ ├── index.html
+│ ├── package.json
+│ ├── postcss.config.cjs
+│ ├── tailwind.config.cjs
+│ └── src/
+│ ├── main.jsx
+│ ├── App.jsx
+│ ├── index.css
+│ ├── assets/
+│ ├── components/
+│ │ ├── Navbar.jsx
+│ │ ├── Sidebar.jsx
+│ │ ├── ProductCard.jsx
+│ │ └── TableMap.jsx
+│ └── pages/
+│ ├── AdminProducts.jsx
+│ ├── Tables.jsx
+│ └── Clients.jsx
+
+├── server/ # Backend (Express)
+│ ├── package.json
+│ └── src/
+│ ├── index.js
+│ └── controllers/
+│ ├── products.js
+│ ├── tables.js
+│ └── clients.js
+
+└── README.md

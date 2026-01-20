@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+
+# Data files (opcional - puedes versionarlos si quieres)
+server/data/*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+
+
