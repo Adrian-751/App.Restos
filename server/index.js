@@ -21,11 +21,31 @@ dotenv.config();
 const app = express();
 
 // Middlewares globales
-const corsOptions = {
-    origin: process.env.FRONTEND_URL || true,
-    credentials: true,
-};
-app.use(cors(corsOptions));
+// CORS
+// - En producción: permitir solo el FRONTEND_URL configurado
+// - En desarrollo: permitir localhost
+// Nota: no usamos cookies, así que no necesitamos `credentials: true`
+const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+].filter(Boolean);
+
+app.use(
+    cors({
+        origin: (origin, callback) => {
+            // Permitir requests sin Origin (ej: curl/health checks)
+            if (!origin) return callback(null, true);
+
+            // Si no se configuró FRONTEND_URL todavía, no bloqueamos (útil para bootstrap)
+            if (allowedOrigins.length === 0) return callback(null, true);
+
+            if (allowedOrigins.includes(origin)) return callback(null, true);
+
+            return callback(new Error(`CORS bloqueado para origin: ${origin}`));
+        },
+    })
+);
 app.use(express.json());
 
 import rateLimit from 'express-rate-limit';
