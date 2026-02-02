@@ -71,7 +71,7 @@ const Caja = () => {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-white mb-6">Gestión de Caja</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 sm:mb-6">Gestión de Caja</h2>
 
             {!caja ? (
                 <div className="card max-w-md mx-auto">
@@ -97,16 +97,16 @@ const Caja = () => {
             ) : (
                 <div className="space-y-6">
                     <div className="card bg-gradient-to-br from-green-600 to-green-800">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-xl font-bold text-white">Caja Abierta</h3>
-                            <button onClick={cerrarCaja} className="btn-secondary">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                            <h3 className="text-lg sm:text-xl font-bold text-white">Caja Abierta</h3>
+                            <button onClick={cerrarCaja} className="btn-secondary w-full sm:w-auto">
                                 Cerrar Caja
                             </button>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <p className="text-green-200 text-sm">Monto Inicial</p>
-                                <p className="text-2xl font-bold text-white">
+                                <p className="text-xl sm:text-2xl font-bold text-white">
                                     ${caja.montoInicial.toLocaleString()}
                                 </p>
                             </div>
@@ -121,19 +121,19 @@ const Caja = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="card bg-gradient-to-br from-blue-600 to-blue-800">
                                 <p className="text-blue-200 text-sm mb-2">Efectivo</p>
-                                <p className="text-3xl font-bold text-white">
+                                <p className="text-2xl sm:text-3xl font-bold text-white">
                                     ${resumen.totalEfectivo.toLocaleString()}
                                 </p>
                             </div>
                             <div className="card bg-gradient-to-br from-purple-600 to-purple-800">
                                 <p className="text-purple-200 text-sm mb-2">Transferencia</p>
-                                <p className="text-3xl font-bold text-white">
+                                <p className="text-2xl sm:text-3xl font-bold text-white">
                                     ${resumen.totalTransferencia.toLocaleString()}
                                 </p>
                             </div>
                             <div className="card bg-gradient-to-br from-fuxia-primary to-fuxia-dark">
                                 <p className="text-fuxia-light text-sm mb-2">Total</p>
-                                <p className="text-3xl font-bold text-white">
+                                <p className="text-2xl sm:text-3xl font-bold text-white">
                                     ${resumen.total.toLocaleString()}
                                 </p>
                             </div>

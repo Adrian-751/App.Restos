@@ -103,9 +103,9 @@ const Productos = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-white">Productos</h2>
-                <button onClick={() => openEditModal()} className="btn-primary">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-2xl sm:text-3xl font-bold text-white">Productos</h2>
+                <button onClick={() => openEditModal()} className="btn-primary w-full sm:w-auto">
                     + Nuevo Producto
                 </button>
             </div>
@@ -141,7 +141,7 @@ const Productos = () => {
                             </div>
                         </div>
 
-                        <div className="flex space-x-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                             <button
                                 onClick={() => {
                                     const nuevoStock = prompt(
@@ -152,19 +152,19 @@ const Productos = () => {
                                         updateStock(producto._id, parseInt(nuevoStock))
                                     }
                                 }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm flex-1"
+                                className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:flex-1 px-3 py-2 rounded-lg text-sm"
                             >
                                 Editar Stock
                             </button>
                             <button
                                 onClick={() => openEditModal(producto)}
-                                className="btn-secondary text-sm px-3"
+                                className="btn-secondary text-sm w-full sm:w-auto px-3"
                             >
                                 ✏️
                             </button>
                             <button
                                 onClick={() => deleteProducto(producto._id)}
-                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm"
+                                className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto px-3 py-2 rounded-lg text-sm"
                             >
                                 🗑️
                             </button>
@@ -175,8 +175,8 @@ const Productos = () => {
 
             {/* Modal de Producto */}
             {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="card bg-slate-800 max-w-md w-full">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                    <div className="card bg-slate-800 max-w-md w-full max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold text-white mb-4">
                             {editingProducto ? 'Editar Producto' : 'Nuevo Producto'}
                         </h3>
@@ -254,13 +254,13 @@ const Productos = () => {
                                     <option value="Postre">Postre</option>
                                 </select>
                             </div>
-                            <div className="flex space-x-4">
-                                <button onClick={saveProducto} className="btn-primary flex-1">
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button onClick={saveProducto} className="btn-primary w-full sm:flex-1">
                                     Guardar
                                 </button>
                                 <button
                                     onClick={() => { setShowModal(false); setEditingProducto(null) }}
-                                    className="btn-secondary flex-1"
+                                    className="btn-secondary w-full sm:flex-1"
                                 >
                                     Cancelar
                                 </button>

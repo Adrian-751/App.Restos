@@ -295,9 +295,9 @@ const Turnos = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-white">Turnos</h2>
-                <button onClick={() => openEditModal()} className="btn-primary">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-2xl sm:text-3xl font-bold text-white">Turnos</h2>
+                <button onClick={() => openEditModal()} className="btn-primary w-full sm:w-auto">
                     + Nuevo Turno
                 </button>
             </div>
@@ -389,18 +389,18 @@ const Turnos = () => {
                                         </div>
                                     )}
 
-                                    <div className="flex space-x-2 mt-4">
+                                    <div className="flex flex-col sm:flex-row gap-2 mt-4">
                                         {turno.estado !== 'Cobrado' && (
                                             <>
                                                 <button
                                                     onClick={() => openEditModal(turno)}
-                                                    className="btn-secondary flex-1 text-sm"
+                                                    className="btn-secondary w-full sm:flex-1 text-sm"
                                                 >
                                                     Editar
                                                 </button>
                                                 <button
                                                     onClick={() => cobrarTurno(turno)}
-                                                    className="btn-primary flex-1 text-sm"
+                                                    className="btn-primary w-full sm:flex-1 text-sm"
                                                 >
                                                     Cobrar
                                                 </button>
@@ -408,7 +408,7 @@ const Turnos = () => {
                                         )}
                                         <button
                                             onClick={() => deleteTurno(turno._id)}
-                                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+                                            className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto px-4 py-2 rounded-lg text-sm"
                                         >
                                             Eliminar
                                         </button>
@@ -537,13 +537,13 @@ const Turnos = () => {
                                 />
                             </div>
 
-                            <div className="flex space-x-4 mt-6">
-                                <button onClick={saveTurno} className="btn-primary flex-1">
+                            <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                                <button onClick={saveTurno} className="btn-primary w-full sm:flex-1">
                                     {editingTurno ? 'Actualizar' : 'Crear'}
                                 </button>
                                 <button
                                     onClick={() => { setShowModal(false); setEditingTurno(null) }}
-                                    className="btn-secondary flex-1"
+                                    className="btn-secondary w-full sm:flex-1"
                                 >
                                     Cancelar
                                 </button>
@@ -555,8 +555,8 @@ const Turnos = () => {
 
             {/* Modal de Cobro */}
             {showCobroModal && turnoACobrar && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="card bg-slate-800 max-w-md w-full">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                    <div className="card bg-slate-800 max-w-md w-full max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold text-white mb-4">
                             Cobrar Turno #{turnoACobrar.numero}
                         </h3>
@@ -665,8 +665,8 @@ const Turnos = () => {
                             </div>
                         </div>
 
-                        <div className="flex space-x-4 mt-6">
-                            <button onClick={confirmarCobro} className="btn-primary flex-1">
+                        <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                            <button onClick={confirmarCobro} className="btn-primary w-full sm:flex-1">
                                 Confirmar Cobro
                             </button>
                             <button
@@ -675,7 +675,7 @@ const Turnos = () => {
                                     setTurnoACobrar(null)
                                     setCobroData({ efectivo: 0, transferencia: 0, observaciones: '' })
                                 }}
-                                className="btn-secondary flex-1"
+                                className="btn-secondary w-full sm:flex-1"
                             >
                                 Cancelar
                             </button>

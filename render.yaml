@@ -12,11 +12,11 @@ services:
       - key: NODE_ENV
         value: production
       - key: AUTH_REQUIRED
-        value: "false"
+        value: "true"
       - key: RATE_LIMIT_ENABLED
         value: "true"
       - key: JWT_EXPIRES_IN
-        value: 24h
+        value: 30d
       # Secrets (se cargan en Render al crear el servicio)
       - key: MONGODB_URI
         sync: false

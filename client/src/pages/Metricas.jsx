@@ -46,7 +46,7 @@ const Metricas = () => {
     if (loading) {
         return (
             <div className="space-y-6">
-                <h2 className="text-3xl font-bold text-white mb-6">Métricas</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 sm:mb-6">Métricas</h2>
                 <div className="card text-center py-12">
                     <p className="text-slate-400">Cargando métricas...</p>
                 </div>
@@ -57,7 +57,7 @@ const Metricas = () => {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-white mb-6">Métricas</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 sm:mb-6">Métricas</h2>
 
             {!metricasSemana && !metricasMes && !loading && (
                 <div className="card">
@@ -143,7 +143,7 @@ const Metricas = () => {
 
             <button
                 onClick={fetchMetricas}
-                className="btn-primary"
+                className="btn-primary w-full sm:w-auto"
             >
                 Actualizar Métricas
             </button>

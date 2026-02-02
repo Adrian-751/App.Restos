@@ -1,5 +1,3 @@
-import Caja from '../models/Caja.js';
-import Pedido from '../models/Pedido.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
 
@@ -7,6 +5,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 * GET /api/metricas/semana
 */
 export const getMetricasSemana = asyncHandler(async (req, res) => {
+    const { Caja, Pedido } = req.models
     // Calcular fecha de inicio de semana (lunes)
     const hoy = new Date();
     const diaSemana = hoy.getDay(); // 0 = domingo, 1 = lunes, etc.
@@ -59,6 +58,7 @@ export const getMetricasSemana = asyncHandler(async (req, res) => {
  * GET /api/metricas/mes
  */
 export const getMetricasMes = asyncHandler(async (req, res) => {
+    const { Caja, Pedido } = req.models
     const hoy = new Date();
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     inicioMes.setHours(0, 0, 0, 0);

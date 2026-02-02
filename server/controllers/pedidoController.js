@@ -1,6 +1,3 @@
-import Pedido from '../models/Pedido.js';
-import Cliente from '../models/Cliente.js';
-import Caja from '../models/Caja.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
 
@@ -8,6 +5,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
  * GET /api/pedidos
  */
 export const getPedidos = asyncHandler(async (req, res) => {
+    const { Pedido } = req.models
     const pedidos = await Pedido.find()
         .populate('mesaId', 'numero nombre')
         .populate('clienteId', 'nombre')
@@ -21,6 +19,7 @@ export const getPedidos = asyncHandler(async (req, res) => {
  * POST /api/pedidos
  */
 export const createPedido = asyncHandler(async (req, res) => {
+    const { Pedido, Cliente } = req.models
     const { mesaId, clienteId, items, total, observaciones } = req.body;
 
     // Determinar estado inicial
@@ -55,6 +54,7 @@ export const createPedido = asyncHandler(async (req, res) => {
  * PUT /api/pedidos/:id
  */
 export const updatePedido = asyncHandler(async (req, res) => {
+    const { Pedido, Cliente, Caja } = req.models
     const pedido = await Pedido.findById(req.params.id);
 
     if (!pedido) {
@@ -113,6 +113,7 @@ export const updatePedido = asyncHandler(async (req, res) => {
  * DELETE /api/pedidos/:id
  */
 export const deletePedido = asyncHandler(async (req, res) => {
+    const { Pedido } = req.models
     const pedido = await Pedido.findByIdAndDelete(req.params.id);
 
     if (!pedido) {

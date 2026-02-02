@@ -1,8 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { connectDB } from './config/database.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { tenantMiddleware } from './tenancy/tenant.js';
+import { attachTenantDb } from './tenancy/attachTenantDb.js';
 
 // Importar rutas
 import authRoutes from './routes/auth.js';
@@ -25,8 +26,14 @@ const app = express();
 // - En producción: permitir solo el FRONTEND_URL configurado
 // - En desarrollo: permitir localhost
 // Nota: no usamos cookies, así que no necesitamos `credentials: true`
+const isProduction = process.env.NODE_ENV === 'production'
+const configuredOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
 const allowedOrigins = [
-    process.env.FRONTEND_URL,
+    ...configuredOrigins,
     'http://localhost:5173',
     'http://127.0.0.1:5173',
 ].filter(Boolean);
@@ -34,6 +41,10 @@ const allowedOrigins = [
 app.use(
     cors({
         origin: (origin, callback) => {
+            // En desarrollo permitimos cualquier origin para que puedas probar desde la red local
+            // (ej: http://192.168.x.x:5173 en el celular).
+            if (!isProduction) return callback(null, true)
+
             // Permitir requests sin Origin (ej: curl/health checks)
             if (!origin) return callback(null, true);
 
@@ -90,6 +101,9 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Multi-tenant: resolver tenant + conectar DB del cliente para todas las rutas /api/*
+app.use('/api', tenantMiddleware, attachTenantDb);
+
 // Rutas de la API
 app.use('/api/auth', authRoutes);
 app.use('/api/caja', cajaRoutes);
@@ -104,12 +118,10 @@ app.use('/api/historico', historicoRoutes);
 // Middleware de manejo de errores (debe ir al final, después de todas las rutas)
 app.use(errorHandler);
 
-// Conectar a la base de datos y iniciar servidor
 const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
     try {
-        await connectDB();
         app.listen(PORT, () => {
             console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
             console.log(`📊 Modo: ${process.env.NODE_ENV || 'development'}`);

@@ -1,4 +1,3 @@
-import Mesa from '../models/Mesa.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
 
@@ -6,6 +5,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
  * GET /api/mesas
  */
 export const getMesas = asyncHandler(async (req, res) => {
+    const { Mesa } = req.models
     const mesas = await Mesa.find().sort({ numero: 1 });
     res.json(mesas);
 });
@@ -15,6 +15,7 @@ export const getMesas = asyncHandler(async (req, res) => {
  * POST /api/mesas
  */
 export const createMesa = asyncHandler(async (req, res) => {
+    const { Mesa } = req.models
     const { numero, nombre, x, y, color } = req.body;
 
     const mesa = await Mesa.create({
@@ -34,6 +35,7 @@ export const createMesa = asyncHandler(async (req, res) => {
  * PUT /api/mesas/:id
  */
 export const updateMesa = asyncHandler(async (req, res) => {
+    const { Mesa } = req.models
     const mesa = await Mesa.findByIdAndUpdate(
         req.params.id,
         req.body,
@@ -52,6 +54,7 @@ export const updateMesa = asyncHandler(async (req, res) => {
  * DELETE /api/mesas/:id
  */
 export const deleteMesa = asyncHandler(async (req, res) => {
+    const { Mesa } = req.models
     const mesa = await Mesa.findByIdAndDelete(req.params.id);
 
     if (!mesa) {

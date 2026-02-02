@@ -1,4 +1,3 @@
-import Caja from '../models/Caja.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
 
@@ -6,6 +5,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
  * GET /api/caja/estado
  */
 export const getEstado = asyncHandler(async (req, res) => {
+    const { Caja } = req.models
     const hoy = new Date().toISOString().split('T')[0];
     const caja = await Caja.findOne({ fecha: hoy, cerrada: false });
 
@@ -17,6 +17,7 @@ export const getEstado = asyncHandler(async (req, res) => {
 * POST /api/caja/abrir
 */
 export const abrirCaja = asyncHandler(async (req, res) => {
+    const { Caja } = req.models
     const { montoInicial } = req.body;
     const hoy = new Date().toISOString().split('T')[0];
 
@@ -33,7 +34,7 @@ export const abrirCaja = asyncHandler(async (req, res) => {
         totalEfectivo: 0,
         totalTransferencia: 0,
         cerrada: false,
-        usuarioId: req.user?.userId || null
+        usuarioId: req.userId || null
     });
 
     res.status(201).json(caja);
@@ -44,6 +45,7 @@ export const abrirCaja = asyncHandler(async (req, res) => {
 * POST /api/caja/cerrar
 */
 export const cerrarCaja = asyncHandler(async (req, res) => {
+    const { Caja } = req.models
     const { id } = req.body;
     const caja = await Caja.findById(id);
 
@@ -69,6 +71,7 @@ export const cerrarCaja = asyncHandler(async (req, res) => {
 * GET /api/caja/resumen/:fecha?
 */
 export const getResumen = asyncHandler(async (req, res) => {
+    const { Caja } = req.models
     const fecha = req.params.fecha || new Date().toISOString().split('T')[0];
     const cajas = await Caja.find({ fecha });
 

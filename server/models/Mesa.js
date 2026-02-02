@@ -32,4 +32,6 @@ const mesaSchema = new mongoose.Schema({
     timestamps: true
 });
 
+export const getMesaModel = (conn) => conn.models.Mesa || conn.model('Mesa', mesaSchema)
+
 export default mongoose.model('Mesa', mesaSchema);

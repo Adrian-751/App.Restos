@@ -63,4 +63,6 @@ const turnoSchema = new mongoose.Schema({
 turnoSchema.index({ estado: 1, createdAt: -1 });
 turnoSchema.index({ eliminadoDeTurnos: 1 });
 
+export const getTurnoModel = (conn) => conn.models.Turno || conn.model('Turno', turnoSchema)
+
 export default mongoose.model('Turno', turnoSchema);

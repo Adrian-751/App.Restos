@@ -39,4 +39,6 @@ const productoSchema = new mongoose.Schema({
     timestamps: true
 });
 
+export const getProductoModel = (conn) => conn.models.Producto || conn.model('Producto', productoSchema)
+
 export default mongoose.model('Producto', productoSchema);

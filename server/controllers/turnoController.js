@@ -1,8 +1,3 @@
-import Turno from '../models/Turno.js';
-import Pedido from '../models/Pedido.js';
-import Mesa from '../models/Mesa.js';
-import Cliente from '../models/Cliente.js';
-import Caja from '../models/Caja.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
 /**
@@ -10,6 +5,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
  * GET /api/turnos
  */
 export const getTurnos = asyncHandler(async (req, res) => {
+    const { Turno } = req.models
     // Filtrar turnos que fueron eliminados de esta sección
     const turnos = await Turno.find({ eliminadoDeTurnos: { $ne: true } })
         .populate('mesaId', 'numero nombre')
@@ -77,6 +73,7 @@ export const getTurnos = asyncHandler(async (req, res) => {
  * POST /api/turnos
  */
 export const createTurno = asyncHandler(async (req, res) => {
+    const { Turno } = req.models
     const { nombre, pedidoId, mesaId, clienteId, total, efectivo, transferencia, observaciones } = req.body;
 
     // Contar turnos del día para asignar número automático
@@ -112,6 +109,7 @@ export const createTurno = asyncHandler(async (req, res) => {
  * PUT /api/turnos/:id
  */
 export const updateTurno = asyncHandler(async (req, res) => {
+    const { Turno, Caja } = req.models
     const turno = await Turno.findById(req.params.id);
 
     if (!turno) {
@@ -163,6 +161,7 @@ export const updateTurno = asyncHandler(async (req, res) => {
  * DELETE /api/turnos/:id
  */
 export const deleteTurno = asyncHandler(async (req, res) => {
+    const { Turno } = req.models
     const turno = await Turno.findById(req.params.id);
 
     if (!turno) {

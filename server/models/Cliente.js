@@ -33,4 +33,6 @@ const clienteSchema = new mongoose.Schema({
     timestamps: true
 });
 
+export const getClienteModel = (conn) => conn.models.Cliente || conn.model('Cliente', clienteSchema)
+
 export default mongoose.model('Cliente', clienteSchema);

@@ -75,7 +75,7 @@ const Historico = () => {
     if (loading) {
         return (
             <div className="space-y-6">
-                <h2 className="text-3xl font-bold text-white">Histórico</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold text-white">Histórico</h2>
                 <div className="card text-center py-12">
                     <p className="text-slate-400">Cargando histórico...</p>
                 </div>
@@ -86,9 +86,9 @@ const Historico = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-white">Histórico de Pedidos</h2>
-                <div className="text-sm text-slate-400">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-2xl sm:text-3xl font-bold text-white">Histórico de Pedidos</h2>
+                <div className="text-sm text-slate-400 sm:text-right">
                     {historico.length} item{historico.length !== 1 ? 's' : ''} cobrado{historico.length !== 1 ? 's' : ''}
                 </div>
             </div>

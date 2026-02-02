@@ -1,7 +1,3 @@
-import Pedido from '../models/Pedido.js';
-import Turno from '../models/Turno.js';
-import Mesa from '../models/Mesa.js';
-import Cliente from '../models/Cliente.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
 /**
@@ -9,6 +5,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
  * GET /api/historico
  */
 export const getHistorico = asyncHandler(async (req, res) => {
+    const { Pedido, Turno } = req.models
     try {
         // Obtener pedidos cobrados con información relacionada
         const pedidosCobrados = await Pedido.find({ estado: 'Cobrado' })
@@ -122,6 +119,7 @@ export const getHistorico = asyncHandler(async (req, res) => {
  * DELETE /api/historico/:id
  */
 export const deleteItemHistorico = asyncHandler(async (req, res) => {
+    const { Pedido, Turno } = req.models
     const { id } = req.params;
 
     // Buscar en pedidos

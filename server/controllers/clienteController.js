@@ -1,4 +1,3 @@
-import Cliente from '../models/Cliente.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
 
@@ -6,6 +5,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
  * GET /api/clientes
  */
 export const getClientes = asyncHandler(async (req, res) => {
+    const { Cliente } = req.models
     const clientes = await Cliente.find().sort({ nombre: 1 });
     res.json(clientes);
 });
@@ -15,6 +15,7 @@ export const getClientes = asyncHandler(async (req, res) => {
  * POST /api/clientes
  */
 export const createCliente = asyncHandler(async (req, res) => {
+    const { Cliente } = req.models
     const { nombre, numero, contacto } = req.body;
 
     // Si no se proporciona número, calcular el siguiente
@@ -40,6 +41,7 @@ export const createCliente = asyncHandler(async (req, res) => {
  * PUT /api/clientes/:id
  */
 export const updateCliente = asyncHandler(async (req, res) => {
+    const { Cliente } = req.models
     const cliente = await Cliente.findByIdAndUpdate(
         req.params.id,
         req.body,
@@ -58,6 +60,7 @@ export const updateCliente = asyncHandler(async (req, res) => {
  * DELETE /api/clientes/:id
  */
 export const deleteCliente = asyncHandler(async (req, res) => {
+    const { Cliente } = req.models
     const cliente = await Cliente.findByIdAndDelete(req.params.id);
 
     if (!cliente) {
@@ -72,6 +75,7 @@ export const deleteCliente = asyncHandler(async (req, res) => {
  * POST /api/clientes/:id/pago
  */
 export const registrarPago = asyncHandler(async (req, res) => {
+    const { Cliente } = req.models
     const { monto, efectivo, transferencia, observaciones } = req.body;
     const cliente = await Cliente.findById(req.params.id);
 

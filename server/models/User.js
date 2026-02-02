@@ -57,4 +57,6 @@ userSchema.methods.toJSON = function () {
     return user;
 };
 
+export const getUserModel = (conn) => conn.models.User || conn.model('User', userSchema)
+
 export default mongoose.model('User', userSchema);

@@ -51,4 +51,6 @@ const cajaSchema = new mongoose.Schema({
 // Índice compuesto para búsquedas por fecha y estado
 cajaSchema.index({ fecha: 1, cerrada: 1 });
 
+export const getCajaModel = (conn) => conn.models.Caja || conn.model('Caja', cajaSchema)
+
 export default mongoose.model('Caja', cajaSchema);

@@ -53,4 +53,6 @@ const pedidoSchema = new mongoose.Schema({
 // Índice para búsquedas por estado
 pedidoSchema.index({ estado: 1, createdAt: -1 });
 
+export const getPedidoModel = (conn) => conn.models.Pedido || conn.model('Pedido', pedidoSchema)
+
 export default mongoose.model('Pedido', pedidoSchema);

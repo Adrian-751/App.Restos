@@ -18,7 +18,8 @@
   }
   
   .card {
-    @apply bg-slate-800 rounded-xl p-6 shadow-xl border border-slate-700;
+    /* Leve transparencia para que se vea el logo de fondo (watermark) detrás del contenido */
+    @apply bg-slate-800/85 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-slate-700/80;
   }
   
   .input-field {

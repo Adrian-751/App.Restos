@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import api from '../utils/api'
 
 const Mesas = () => {
@@ -41,6 +41,10 @@ const Mesas = () => {
     const [cantidad, setCantidad] = useState(1)
     const [precioPersonalizado, setPrecioPersonalizado] = useState('')
 
+    // Drag táctil / pointer (móvil + desktop)
+    const mapRef = useRef(null)
+    const draggingRef = useRef(null) // { mesaId, offsetX, offsetY }
+
     const handleDragStart = (e, mesa) => {
         if (!mesa || !mesa._id) {
             e.preventDefault()
@@ -48,6 +52,74 @@ const Mesas = () => {
         }
         e.dataTransfer.setData('mesaId', mesa._id)
         e.dataTransfer.effectAllowed = 'move'
+    }
+
+    const startPointerDrag = (e, mesa) => {
+        if (!mesa || !mesa._id) return
+
+        // Evitar que el navegador haga scroll/zoom durante el drag
+        e.preventDefault()
+        e.stopPropagation()
+
+        const container = mapRef.current
+        if (!container) return
+        const rect = container.getBoundingClientRect()
+
+        const clientX = e.clientX ?? (e.touches?.[0]?.clientX)
+        const clientY = e.clientY ?? (e.touches?.[0]?.clientY)
+        if (typeof clientX !== 'number' || typeof clientY !== 'number') return
+
+        const pointerX = clientX - rect.left
+        const pointerY = clientY - rect.top
+
+        draggingRef.current = {
+            mesaId: mesa._id,
+            offsetX: pointerX - (mesa.x || 0),
+            offsetY: pointerY - (mesa.y || 0),
+        }
+
+        // Capturar el pointer para recibir movimientos aunque salga del elemento
+        try {
+            e.currentTarget.setPointerCapture?.(e.pointerId)
+        } catch {
+            // ignore
+        }
+    }
+
+    const movePointerDrag = (e) => {
+        const drag = draggingRef.current
+        if (!drag) return
+        const container = mapRef.current
+        if (!container) return
+        const rect = container.getBoundingClientRect()
+
+        const clientX = e.clientX ?? (e.touches?.[0]?.clientX)
+        const clientY = e.clientY ?? (e.touches?.[0]?.clientY)
+        if (typeof clientX !== 'number' || typeof clientY !== 'number') return
+
+        const x = clientX - rect.left - drag.offsetX
+        const y = clientY - rect.top - drag.offsetY
+
+        // Actualizar en UI en tiempo real (sin esperar al backend)
+        setMesas((prev) =>
+            prev.map((m) => (m._id === drag.mesaId ? { ...m, x, y } : m))
+        )
+    }
+
+    const endPointerDrag = async () => {
+        const drag = draggingRef.current
+        if (!drag) return
+        draggingRef.current = null
+
+        const mesa = mesas.find((m) => m._id === drag.mesaId)
+        if (!mesa) return
+
+        try {
+            await api.put(`/mesas/${drag.mesaId}`, { x: mesa.x, y: mesa.y })
+            fetchMesas()
+        } catch (error) {
+            console.error('Error updating mesa position:', error)
+        }
     }
 
     const handleDrop = async (e) => {
@@ -240,30 +312,35 @@ const Mesas = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-white">Mapa de Mesas</h2>
-                <button onClick={() => openEditModal()} className="btn-primary">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-2xl sm:text-3xl font-bold text-white">Mapa de Mesas</h2>
+                <button onClick={() => openEditModal()} className="btn-primary w-full sm:w-auto">
                     + Nueva Mesa
                 </button>
             </div>
 
             <div
-                className="card relative min-h-[600px] bg-slate-900"
+                ref={mapRef}
+                className="card relative min-h-[520px] sm:min-h-[600px] bg-slate-900 touch-none"
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
+                onPointerMove={movePointerDrag}
+                onPointerUp={endPointerDrag}
+                onPointerCancel={endPointerDrag}
             >
                 {mesas.map((mesa) => (
                     <div
                         key={mesa._id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, mesa)}
+                        onPointerDown={(e) => startPointerDrag(e, mesa)}
                         onDoubleClick={(e) => handleDoubleClick(e, mesa)}
                         style={{
                             left: `${mesa.x}px`,
                             top: `${mesa.y}px`,
                             position: 'absolute',
                         }}
-                        className="cursor-move group"
+                        className="cursor-move touch-none select-none group"
                     >
                         <div
                             className="w-20 h-20 rounded-lg shadow-lg flex flex-col items-center justify-center text-white font-bold transition-transform hover:scale-110"

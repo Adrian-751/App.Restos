@@ -1,4 +1,3 @@
-import Producto from '../models/Producto.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
 /**
@@ -6,6 +5,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
  * GET /api/productos
  */
 export const getProductos = asyncHandler(async (req, res) => {
+    const { Producto } = req.models
     const productos = await Producto.find().sort({ numero: 1 });
     res.json(productos);
 });
@@ -15,6 +15,7 @@ export const getProductos = asyncHandler(async (req, res) => {
  * POST /api/productos
  */
 export const createProducto = asyncHandler(async (req, res) => {
+    const { Producto } = req.models
     const { nombre, precio, stock, categoria, descripcion } = req.body;
 
     // Calcular número automático si no se proporciona
@@ -42,6 +43,7 @@ export const createProducto = asyncHandler(async (req, res) => {
  * PUT /api/productos/:id
  */
 export const updateProducto = asyncHandler(async (req, res) => {
+    const { Producto } = req.models
     const producto = await Producto.findByIdAndUpdate(
         req.params.id,
         req.body,
@@ -60,6 +62,7 @@ export const updateProducto = asyncHandler(async (req, res) => {
  * DELETE /api/productos/:id
  */
 export const deleteProducto = asyncHandler(async (req, res) => {
+    const { Producto } = req.models
     const producto = await Producto.findByIdAndDelete(req.params.id);
 
     if (!producto) {

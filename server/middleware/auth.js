@@ -1,12 +1,11 @@
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
 
 /**
  * Middleware para verificar el token JWT.
  * - Valida el Bearer token
  * - Carga el usuario desde MongoDB
  * - Setea: req.userId, req.userRole, req.user
- */
+*/
 export const authenticate = async (req, res, next) => {
     try {
         // Permite desactivar auth temporalmente en desarrollo:
@@ -22,10 +21,10 @@ export const authenticate = async (req, res, next) => {
 
         /**
          * Por defecto, NO bloqueamos la app si no hay login/UI.
-         * - Si AUTH_REQUIRED=true => el token es obligatorio y se responde 401 sin header.
-         * - Si AUTH_REQUIRED!=true => el token es opcional: si no hay header, se deja pasar.
+         * - Si AUTH_REQUIRED=false => el token es opcional: si no hay header, se deja pasar.
+         * - En cualquier otro caso (incluyendo no configurado) => el token es obligatorio.
          */
-        const authRequired = process.env.AUTH_REQUIRED === 'true';
+        const authRequired = process.env.AUTH_REQUIRED !== 'false';
         const hasBearer = !!authHeader && authHeader.startsWith('Bearer ');
         if (!hasBearer) {
             if (authRequired) {
@@ -44,6 +43,15 @@ export const authenticate = async (req, res, next) => {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // Validación multi-tenant: el token debe pertenecer al tenant actual
+        if (decoded?.tenant && req.tenant && decoded.tenant !== req.tenant) {
+            return res.status(401).json({ error: 'Token no corresponde a este cliente' });
+        }
+
+        const { User } = req.models || {}
+        if (!User) {
+            return res.status(500).json({ error: 'Modelos no inicializados para este cliente' });
+        }
         const user = await User.findById(decoded.userId);
 
         if (!user || !user.activo) {
@@ -69,7 +77,7 @@ export const authenticate = async (req, res, next) => {
 /**
  * Middleware de autorización por roles.
  * Uso: router.post('/x', authenticate, authorize('admin'), handler)
- */
+*/
 export const authorize = (...roles) => {
     return (req, res, next) => {
         if (!req.userRole) {

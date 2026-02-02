@@ -1,15 +1,15 @@
-import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
 /**
  * Genera un token JWT para el usuario
  */
-const generateToken = (userId) => {
+const generateToken = (userId, tenant) => {
     return jwt.sign(
-        { userId },
+        { userId, tenant },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+        // Para que la sesión se mantenga (tipo Instagram/WhatsApp), usamos 30 días por defecto.
+        { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
     );
 };
 
@@ -19,6 +19,7 @@ const generateToken = (userId) => {
  */
 export const register = asyncHandler(async (req, res) => {
     const { email, password, nombre, role } = req.body;
+    const { User } = req.models
 
     // Verificar si el usuario ya existe
     const userExists = await User.findOne({ email });
@@ -35,7 +36,7 @@ export const register = asyncHandler(async (req, res) => {
     });
 
     // Generar token
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, req.tenant);
 
     res.status(201).json({
         message: 'Usuario creado exitosamente',
@@ -55,6 +56,7 @@ export const register = asyncHandler(async (req, res) => {
  */
 export const login = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
+    const { User } = req.models
 
     // Buscar usuario
     const user = await User.findOne({ email });
@@ -74,7 +76,7 @@ export const login = asyncHandler(async (req, res) => {
     }
 
     // Generar token
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, req.tenant);
 
     res.json({
         message: 'Login exitoso',
@@ -96,6 +98,7 @@ export const getMe = asyncHandler(async (req, res) => {
     if (!req.userId) {
         return res.status(401).json({ error: 'No autenticado' });
     }
+    const { User } = req.models
     const user = await User.findById(req.userId);
 
     if (!user) {

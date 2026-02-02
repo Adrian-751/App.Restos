@@ -91,7 +91,7 @@ const Panel = () => {
     if (loading) {
         return (
             <div className="space-y-6">
-                <h2 className="text-3xl font-bold text-white mb-6">Panel de Administración</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 sm:mb-6">Panel de Administración</h2>
                 <div className="card text-center py-12">
                     <p className="text-slate-400">Cargando estadísticas...</p>
                 </div>
@@ -102,7 +102,7 @@ const Panel = () => {
     if (!stats) {
         return (
             <div className="space-y-6">
-                <h2 className="text-3xl font-bold text-white mb-6">Panel de Administración</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 sm:mb-6">Panel de Administración</h2>
                 <div className="card text-center py-12">
                     <p className="text-slate-400">No se pudieron cargar las estadísticas</p>
                     <button onClick={fetchStats} className="btn-primary mt-4">
@@ -115,7 +115,7 @@ const Panel = () => {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-white mb-6">Panel de Administración</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 sm:mb-6">Panel de Administración</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="card bg-gradient-to-br from-orange-600 to-orange-800">
