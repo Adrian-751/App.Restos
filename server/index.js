@@ -21,6 +21,13 @@ dotenv.config();
 
 const app = express();
 
+// Importante en producción detrás de proxies (Render/Vercel):
+// - Permite que req.ip refleje el IP real (X-Forwarded-For)
+// - Evita que rate-limit trate a todos como "la misma IP"
+if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1)
+}
+
 // Middlewares globales
 // CORS
 // - En producción: permitir solo el FRONTEND_URL configurado
@@ -64,7 +71,9 @@ import rateLimit from 'express-rate-limit';
 // Rate limiting general para toda la API
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 100, // máximo 100 requests por IP en la ventana
+    // En apps tipo panel (móvil/PWA) es normal hacer muchas requests.
+    // Subimos el límite para evitar falsos positivos.
+    max: 2000, // máximo 2000 requests por IP en la ventana
     message: {
         error: 'Demasiadas peticiones desde esta IP, intenta más tarde'
     },
@@ -75,7 +84,7 @@ const limiter = rateLimit({
 // Rate limiting más estricto para autenticación
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 5, // máximo 5 intentos de login/register
+    max: 25, // máximo 25 intentos de login/register
     message: {
         error: 'Demasiados intentos, intenta más tarde'
     },

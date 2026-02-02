@@ -31,14 +31,30 @@ const Caja = () => {
         }
         window.addEventListener('caja-updated', handleCajaUpdate)
 
-        // Refrescar cada 5 segundos para mantener los datos actualizados
-        const interval = setInterval(() => {
-            fetchCaja()
-        }, 5000)
+        // Refrescar cada 30 segundos (y pausar si la app queda en background)
+        let interval = null
+        const start = () => {
+            if (interval) return
+            interval = setInterval(() => fetchCaja(), 30000)
+        }
+        const stop = () => {
+            if (!interval) return
+            clearInterval(interval)
+            interval = null
+        }
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') start()
+            else stop()
+        }
+
+        onVisibilityChange()
+        document.addEventListener('visibilitychange', onVisibilityChange)
 
         return () => {
             window.removeEventListener('caja-updated', handleCajaUpdate)
-            clearInterval(interval)
+            document.removeEventListener('visibilitychange', onVisibilityChange)
+            stop()
         }
     }, [])
 
