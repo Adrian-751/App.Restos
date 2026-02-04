@@ -38,21 +38,21 @@ const Layout = ({ children }) => {
             )}
 
             {/* Header */}
-            <header className="relative z-10 bg-gradient-to-r from-fuxia-primary to-fuxia-dark shadow-2xl">
+            <header className="relative z-10">
                 <div className="container mx-auto px-4 py-6">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3 sm:space-x-4">
-                            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-full flex items-center justify-center shadow-lg overflow-hidden">
+                        <div className="flex items-center space-x-4">
+                            <div className="w-16 h-16 aspect-square shrink-0 bg-fuxia-primary rounded-full flex items-center justify-center shadow-lg overflow-hidden">
                                 <img
                                     src="/Algarrobo-512x512.png"
                                     alt="Algarrobos Futbol"
-                                    className="w-10 h-10 sm:w-14 sm:h-14 object-contain"
+                                    className="w-14 h-14"
                                     loading="eager"
                                 />
                             </div>
                             <div>
-                                <h1 className="text-lg sm:text-2xl font-bold text-white leading-tight">ALGARROBOS FUTBOL</h1>
-                                <p className="text-fuxia-light text-sm sm:text-lg leading-tight">Gastro Gestión</p>
+                                <h1 className="text-2xl font-bold text-fuxia-primary">ALGARROBOS FUTBOL</h1>
+                                <p className="text-white text-lg">Gastro Gestión</p>
                             </div>
                         </div>
 
@@ -60,7 +60,7 @@ const Layout = ({ children }) => {
                             <div className="flex items-center gap-3">
                                 <div className="hidden sm:block text-right">
                                     <p className="text-white text-sm font-semibold">{user?.nombre || 'Usuario'}</p>
-                                    <p className="text-fuxia-light text-xs">{user?.role || ''}</p>
+                                    <p className="text-fuxia-primary text-xs">{user?.role || ''}</p>
                                 </div>
                                 <button
                                     className="bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all"
@@ -84,14 +84,14 @@ const Layout = ({ children }) => {
 
             {/* Bottom Navigation */}
             {!isAuthPage && (
-                <nav className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900 border-t border-slate-700 shadow-2xl pb-[env(safe-area-inset-bottom)]">
+                <nav className="fixed bottom-0 left-0 right-0 z-10 bg-slate-900 border-t border-slate-700 shadow-2xl">
                     <div className="container mx-auto px-4">
                         <div className="relative">
                             {/* Botón izquierda (móvil) */}
                             <button
                                 type="button"
                                 aria-label="Scroll izquierda"
-                                className="sm:hidden absolute left-0 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-slate-800/90 border border-slate-700 text-white flex items-center justify-center"
+                                className="sm:hidden absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-slate-800/90 border border-slate-700 text-white flex items-center justify-center"
                                 onClick={() => navScrollRef.current?.scrollBy({ left: -220, behavior: 'smooth' })}
                             >
                                 ‹
@@ -101,7 +101,7 @@ const Layout = ({ children }) => {
                             <button
                                 type="button"
                                 aria-label="Scroll derecha"
-                                className="sm:hidden absolute right-0 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-slate-800/90 border border-slate-700 text-white flex items-center justify-center"
+                                className="sm:hidden absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-slate-800/90 border border-slate-700 text-white flex items-center justify-center"
                                 onClick={() => navScrollRef.current?.scrollBy({ left: 220, behavior: 'smooth' })}
                             >
                                 ›
@@ -138,7 +138,7 @@ const Layout = ({ children }) => {
             )}
 
             {/* Spacer for bottom nav */}
-            {!isAuthPage && <div className="h-24 sm:h-20 pointer-events-none"></div>}
+            {!isAuthPage && <div className="relative z-10 h-20"></div>}
         </div>
     )
 }

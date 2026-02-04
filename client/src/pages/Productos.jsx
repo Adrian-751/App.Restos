@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../utils/api'
+import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
 
 const Productos = () => {
     const [productos, setProductos] = useState([])
@@ -13,6 +14,8 @@ const Productos = () => {
         cantidadDisponible: '',
         categoria: 'general',
     })
+
+    useLockBodyScroll(!!showModal)
 
     const openEditModal = (producto = null) => {
         if (producto) {
@@ -175,8 +178,8 @@ const Productos = () => {
 
             {/* Modal de Producto */}
             {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <div className="card bg-slate-800 max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div className="fixed inset-0 bg-black/50 z-[60] p-4 overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center">
+                    <div className="card bg-slate-800 max-w-md w-full max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold text-white mb-4">
                             {editingProducto ? 'Editar Producto' : 'Nuevo Producto'}
                         </h3>

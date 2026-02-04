@@ -10,7 +10,7 @@ export default {
                 'dark-bg': '#0f172a', // slate-900
                 'dark-text': '#f1f5f9', // slate-100
                 'fuxia-primary': '#d946ef', // fuchsia-500
-                'fuxia-light': '#f0abfc', // fuchsia-300
+                'fuxia-light': '#ff00ff', // fuchsia-300
                 'fuxia-dark': '#a21caf', // fuchsia-700
             },
         },

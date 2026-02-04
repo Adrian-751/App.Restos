@@ -44,7 +44,7 @@ const Panel = () => {
 
             const mesasArray = Array.isArray(mesas.data) ? mesas.data : []
             const pedidosArray = Array.isArray(pedidos.data) ? pedidos.data : []
-            
+
             setStats({
                 cajaAbierta: !!caja.data,
                 mesasOcupadas: mesasArray.filter((m) => m.estado === 'ocupada').length,
@@ -145,7 +145,7 @@ const Panel = () => {
                     </div>
                 </div>
 
-                <div className="card bg-gradient-to-br from-purple-600 to-purple-800">
+                <div className="card bg-gradient-to-r from-fuxia-primary to-fuxia-dark">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-green-200 text-sm">Mesas Reservadas</p>

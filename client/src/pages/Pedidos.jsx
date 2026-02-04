@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../utils/api'
+import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
 
 const Pedidos = () => {
     const [pedidos, setPedidos] = useState([])
@@ -21,6 +22,8 @@ const Pedidos = () => {
         transferencia: 0,
         observaciones: '',
     })
+
+    useLockBodyScroll(!!showModal || !!showCobroModal)
 
     const capitalizeFirst = (value) => {
         const s = (value ?? '').toString().trim()
@@ -351,8 +354,8 @@ const Pedidos = () => {
 
             {/* Modal de Pedido */}
             {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <div className="card bg-slate-800 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="fixed inset-0 bg-black/50 z-[60] p-4 overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center">
+                    <div className="card bg-slate-800 max-w-2xl w-full max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold text-white mb-4">
                             {editingPedido ? 'Editar Pedido' : 'Nuevo Pedido'}
                         </h3>
@@ -390,10 +393,10 @@ const Pedidos = () => {
                                             </option>
                                         ))}
                                     </select>
-                                    <div className="flex items-stretch border border-slate-600 rounded">
+                                    <div className="flex w-full sm:w-auto items-center border border-slate-600 rounded h-10 sm:h-auto">
                                         <button
                                             onClick={() => setCantidad(Math.max(1, (parseInt(cantidad) || 1) - 1))}
-                                            className="px-2 text-white hover:bg-slate-600 transition-colors"
+                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                             type="button"
                                         >
                                             -
@@ -402,12 +405,12 @@ const Pedidos = () => {
                                             type="number"
                                             value={cantidad}
                                             onChange={(e) => setCantidad(e.target.value)}
-                                            className="w-12 text-center text-white bg-transparent border-0 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            className="flex-1 sm:flex-none sm:w-12 h-10 sm:h-auto text-center text-white bg-transparent border-0 focus:outline-none focus:ring-0 leading-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             min="1"
                                         />
                                         <button
                                             onClick={() => setCantidad((parseInt(cantidad) || 1) + 1)}
-                                            className="px-2 text-white hover:bg-slate-600 transition-colors"
+                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                             type="button"
                                         >
                                             +
@@ -445,10 +448,10 @@ const Pedidos = () => {
                                                     )}
                                                 </span>
                                                 <div className="flex items-center space-x-2">
-                                                    <div className="flex items-stretch border border-slate-600 rounded">
+                                                    <div className="flex items-center border border-slate-600 rounded h-10 sm:h-auto">
                                                         <button
                                                             onClick={() => updateItemQuantity(idx, item.cantidad - 1)}
-                                                            className="px-2 text-white hover:bg-slate-600 transition-colors"
+                                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                                             type="button"
                                                         >
                                                             -
@@ -458,11 +461,11 @@ const Pedidos = () => {
                                                             value={item.cantidad}
                                                             onChange={(e) => updateItemQuantity(idx, e.target.value)}
                                                             min="1"
-                                                            className="w-12 text-center text-white bg-slate-700 border-0 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                            className="w-12 h-10 sm:h-auto text-center text-white bg-slate-700 border-0 focus:outline-none focus:ring-0 leading-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                         />
                                                         <button
                                                             onClick={() => updateItemQuantity(idx, item.cantidad + 1)}
-                                                            className="px-2 text-white hover:bg-slate-600 transition-colors"
+                                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                                             type="button"
                                                         >
                                                             +
@@ -506,8 +509,8 @@ const Pedidos = () => {
 
             {/* Modal de Cobro */}
             {showCobroModal && pedidoACobrar && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <div className="card bg-slate-800 max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div className="fixed inset-0 bg-black/50 z-[60] p-4 overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center">
+                    <div className="card bg-slate-800 max-w-md w-full max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold text-white mb-4">
                             Cobrar Pedido - {(() => {
                                 const mesa = mesas.find((m) => m._id === pedidoACobrar.mesaId)
