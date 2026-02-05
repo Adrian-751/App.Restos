@@ -13,7 +13,7 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-md' }) => {
 
     return (
         <div 
-            className="fixed inset-0 bg-black/50 z-[60] p-4 overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center"
+            className="fixed inset-0 bg-black/50 z-[60] px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] sm:p-4 overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center"
             onClick={onClose}
         >
             <div 

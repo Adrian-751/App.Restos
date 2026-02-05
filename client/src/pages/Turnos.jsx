@@ -423,7 +423,7 @@ const Turnos = () => {
 
             {/* Modal de Crear/Editar Turno */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 z-[60] p-4 overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center">
+                <div className="fixed inset-0 bg-black/50 z-[60] px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] sm:p-4 overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center">
                     <div className="card bg-slate-800 max-w-2xl w-full max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold text-white mb-4">
                             {editingTurno ? 'Editar Turno' : 'Nuevo Turno'}
@@ -558,7 +558,7 @@ const Turnos = () => {
 
             {/* Modal de Cobro */}
             {showCobroModal && turnoACobrar && (
-                <div className="fixed inset-0 bg-black/50 z-[60] p-4 overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center">
+                <div className="fixed inset-0 bg-black/50 z-[60] px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] sm:p-4 overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center">
                     <div className="card bg-slate-800 max-w-md w-full max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold text-white mb-4">
                             Cobrar Turno #{turnoACobrar.numero}
