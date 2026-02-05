@@ -86,12 +86,24 @@ Creás los registros que te pide Vercel.
 ### Android (Chrome)
 
 - Abre `https://app.tudominio.com`
-- Menú del navegador → **Instalar app** (o aparece un banner)
+- Menú del navegador (⋮) → **Instalar app** (o aparece un banner)
 
 ### iPhone (Safari)
 
 - Abre `https://app.tudominio.com`
 - Botón compartir → **Agregar a pantalla de inicio**
+
+### Escritorio (Chrome / Edge)
+
+- Abre `https://app.tudominio.com`
+- En la barra de direcciones suele aparecer un ícono de **instalar** (monitor con flecha / “+”)
+  - o Menú (⋮) → **Instalar Algarrobos**
+
+### Importante (si no aparece instalar)
+
+- Debe ser **HTTPS**
+- Debe estar cargando el `manifest.webmanifest`
+- A veces hay que refrescar 1 vez y navegar un poco (el navegador “detecta” que es instalable)
 
 ---
 

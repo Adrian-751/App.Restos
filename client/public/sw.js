@@ -4,7 +4,8 @@
  * - Para SPA: fallback a /index.html en navegación si no hay cache
  */
 
-const CACHE_NAME = 'app-restos-v1'
+// IMPORTANT: Bump this when deploying changes to ensure clients drop old cached assets.
+const CACHE_NAME = 'app-restos-v2'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
