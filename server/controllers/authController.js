@@ -18,8 +18,10 @@ const generateToken = (userId, tenant) => {
  * POST /api/auth/register
  */
 export const register = asyncHandler(async (req, res) => {
-    const { email, password, nombre, role } = req.body;
+    let { email, password, nombre, role } = req.body;
     const { User } = req.models
+
+    email = (email || '').toString().trim().toLowerCase()
 
     // Verificar si el usuario ya existe
     const userExists = await User.findOne({ email });
@@ -55,8 +57,10 @@ export const register = asyncHandler(async (req, res) => {
  * POST /api/auth/login
  */
 export const login = asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
     const { User } = req.models
+    email = (email || '').toString().trim().toLowerCase()
+    password = (password || '').toString()
 
     // Buscar usuario
     const user = await User.findOne({ email });
@@ -70,7 +74,21 @@ export const login = asyncHandler(async (req, res) => {
     }
 
     // Verificar contraseña
-    const isPasswordValid = await user.comparePassword(password);
+    let isPasswordValid = await user.comparePassword(password);
+
+    // Compatibilidad: si el usuario viene de una versión vieja con contraseña en texto plano,
+    // y coincide, la migramos automáticamente a bcrypt al primer login.
+    // (bcrypt hashes suelen empezar con "$2")
+    if (!isPasswordValid) {
+        const stored = user.password
+        const looksHashed = typeof stored === 'string' && stored.startsWith('$2')
+        if (!looksHashed && typeof stored === 'string' && stored === password) {
+            user.password = password
+            await user.save() // dispara pre('save') y hashea
+            isPasswordValid = true
+        }
+    }
+
     if (!isPasswordValid) {
         return res.status(401).json({ error: 'Credenciales inválidas' });
     }
