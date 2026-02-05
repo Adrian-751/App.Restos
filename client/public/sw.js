@@ -5,7 +5,7 @@
  */
 
 // IMPORTANT: Bump this when deploying changes to ensure clients drop old cached assets.
-const CACHE_NAME = 'app-restos-v2'
+const CACHE_NAME = 'app-restos-v3'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -13,10 +13,10 @@ self.addEventListener('install', (event) => {
       cache.addAll([
         '/',
         '/index.html',
-        '/logo.svg',
         '/manifest.webmanifest',
-        '/pwa-192x192.png',
-        '/pwa-512x512.png'
+        // Iconos actuales (mismo logo que Login/Register)
+        '/pwa-192x192-2.png',
+        '/pwa-512x512-2.png'
       ])
     )
   )

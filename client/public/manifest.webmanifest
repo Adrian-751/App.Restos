@@ -1,6 +1,6 @@
 {
-  "name": "Algarrobos Futbol - Sistema de Gestión",
-  "short_name": "Algarrobos",
+  "name": "GastroGestión",
+  "short_name": "GastroGestión",
   "description": "Sistema de gestión para restaurantes y canchas de fútbol",
   "start_url": "/",
   "scope": "/",
@@ -15,10 +15,22 @@
       "purpose": "any"
     },
     {
+      "src": "/pwa-192x192-2.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
       "src": "/pwa-512x512-2.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512-2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

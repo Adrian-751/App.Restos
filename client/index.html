@@ -2,9 +2,11 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <!-- Favicon (pestaña del navegador): mismo logo que Login/Register -->
-    <link rel="icon" type="image/png" href="/pwa-192x192-2.png" />
-    <link rel="shortcut icon" href="/pwa-192x192-2.png" />
+    <!-- Favicon (pestaña del navegador): PNG con fondo sólido (mejor en escritorio).
+         Nota: el "zoom" del favicon NO se controla con CSS, depende del archivo. -->
+    <link rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512-2.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192-2.png" />
+    <link rel="shortcut icon" href="/pwa-512x512-2.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Sistema de gestión para restaurantes y canchas de fútbol" />
     <!-- Usamos el fondo oscuro para evitar UI fuxia en barras/scroll en escritorio -->
@@ -14,7 +16,7 @@
     <!-- iOS: para “Agregar a pantalla de inicio” (apple-touch-icon idealmente debe ser PNG 180/192+) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Algarrobos" />
+    <meta name="apple-mobile-web-app-title" content="GastroGestión" />
     <!-- iOS usa este icono para "Agregar a pantalla de inicio" -->
     <link rel="apple-touch-icon" href="/pwa-192x192-2.png" />
     <title>Algarrobos Futbol - Sistema de Gestión</title>
