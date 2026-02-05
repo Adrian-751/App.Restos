@@ -55,6 +55,23 @@ const Mesas = () => {
             e.preventDefault()
             return
         }
+        // Guardar también el offset dentro de la mesa para que al soltar quede exacto
+        // (si no, se posiciona el top-left en el cursor y se siente "corrida")
+        try {
+            const container = mapRef.current
+            if (container) {
+                const rect = container.getBoundingClientRect()
+                const offsetX = (e.clientX - rect.left) - (mesa.x || 0)
+                const offsetY = (e.clientY - rect.top) - (mesa.y || 0)
+                e.dataTransfer.setData(
+                    'application/x-mesa-dnd',
+                    JSON.stringify({ mesaId: mesa._id, offsetX, offsetY })
+                )
+            }
+        } catch {
+            // ignore
+        }
+
         e.dataTransfer.setData('mesaId', mesa._id)
         e.dataTransfer.effectAllowed = 'move'
     }
@@ -68,6 +85,10 @@ const Mesas = () => {
 
     const startPointerDrag = (e, mesa) => {
         if (!mesa || !mesa._id) return
+
+        // En escritorio (mouse) NO usamos el "press & hold".
+        // Dejamos el comportamiento original de drag (HTML5 draggable).
+        if (e.pointerType === 'mouse') return
 
         // IMPORTANTE:
         // - No hacemos preventDefault acá para permitir scroll vertical en mobile.
@@ -163,12 +184,25 @@ const Mesas = () => {
     const handleDrop = async (e) => {
         e.preventDefault()
         e.stopPropagation()
-        const mesaId = e.dataTransfer.getData('mesaId')
+        let mesaId = e.dataTransfer.getData('mesaId')
+        let offsetX = 0
+        let offsetY = 0
+        try {
+            const raw = e.dataTransfer.getData('application/x-mesa-dnd')
+            if (raw) {
+                const parsed = JSON.parse(raw)
+                if (parsed?.mesaId) mesaId = parsed.mesaId
+                offsetX = Number(parsed?.offsetX) || 0
+                offsetY = Number(parsed?.offsetY) || 0
+            }
+        } catch {
+            // ignore
+        }
         if (!mesaId) return
 
         const rect = e.currentTarget.getBoundingClientRect()
-        const x = e.clientX - rect.left
-        const y = e.clientY - rect.top
+        const x = (e.clientX - rect.left) - offsetX
+        const y = (e.clientY - rect.top) - offsetY
 
         try {
             await api.put(`/mesas/${mesaId}`, { x, y })
@@ -183,6 +217,11 @@ const Mesas = () => {
     const handleDragOver = (e) => {
         e.preventDefault()
         e.stopPropagation()
+        try {
+            e.dataTransfer.dropEffect = 'move'
+        } catch {
+            // ignore
+        }
     }
 
     const openEditModal = (mesa = null) => {
@@ -381,7 +420,7 @@ const Mesas = () => {
                         className="cursor-move select-none group touch-pan-y"
                     >
                         <div
-                            className="w-14 h-14 rounded-lg shadow-lg flex flex-col items-center justify-center text-white font-bold transition-transform hover:scale-110"
+                            className="w-14 h-14 lg:w-20 lg:h-20 rounded-lg shadow-lg flex flex-col items-center justify-center text-white font-bold transition-transform hover:scale-110"
                             style={{ backgroundColor: mesa.color, opacity: mesa.estado === 'ocupada' ? 0.8 : mesa.estado === 'reservada' ? 0.9 : 1 }}
                         >
                             <span className="text-sm">{mesa.numero}</span>

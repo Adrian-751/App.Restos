@@ -24,7 +24,7 @@ const Layout = ({ children }) => {
     ]
 
     return (
-        <div className="min-h-screen bg-dark-bg relative overflow-hidden">
+        <div className="min-h-screen bg-dark-bg relative overflow-x-hidden">
             {/* Watermark global (NO en Mesas para no afectar el mapa) */}
             {showWatermark && (
                 <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center">
@@ -84,14 +84,14 @@ const Layout = ({ children }) => {
 
             {/* Bottom Navigation */}
             {!isAuthPage && (
-                <nav className="fixed bottom-0 left-0 right-0 z-10 bg-slate-900 border-t border-slate-700 shadow-2xl">
+                <nav className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900 border-t border-slate-700 shadow-2xl pb-[env(safe-area-inset-bottom)] touch-manipulation">
                     <div className="container mx-auto px-4">
                         <div className="relative">
                             {/* Botón izquierda (móvil) */}
                             <button
                                 type="button"
                                 aria-label="Scroll izquierda"
-                                className="sm:hidden absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-slate-800/90 border border-slate-700 text-white flex items-center justify-center"
+                                className="sm:hidden absolute left-0 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-slate-800/90 border border-slate-700 text-white flex items-center justify-center touch-manipulation"
                                 onClick={() => navScrollRef.current?.scrollBy({ left: -220, behavior: 'smooth' })}
                             >
                                 ‹
@@ -101,7 +101,7 @@ const Layout = ({ children }) => {
                             <button
                                 type="button"
                                 aria-label="Scroll derecha"
-                                className="sm:hidden absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-slate-800/90 border border-slate-700 text-white flex items-center justify-center"
+                                className="sm:hidden absolute right-0 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-slate-800/90 border border-slate-700 text-white flex items-center justify-center touch-manipulation"
                                 onClick={() => navScrollRef.current?.scrollBy({ left: 220, behavior: 'smooth' })}
                             >
                                 ›
@@ -109,7 +109,7 @@ const Layout = ({ children }) => {
 
                             <div
                                 ref={navScrollRef}
-                                className="flex items-center gap-2 py-3 overflow-x-auto sm:overflow-x-visible sm:justify-around scroll-smooth px-10 sm:px-0"
+                                className="flex items-center gap-2 py-3 overflow-x-auto sm:overflow-x-visible sm:justify-around scroll-smooth px-10 sm:px-0 touch-pan-x"
                                 style={{ WebkitOverflowScrolling: 'touch' }}
                             >
                                 {navItems.map((item) => {
@@ -138,7 +138,7 @@ const Layout = ({ children }) => {
             )}
 
             {/* Spacer for bottom nav */}
-            {!isAuthPage && <div className="relative z-10 h-20"></div>}
+            {!isAuthPage && <div className="h-24 sm:h-20 pointer-events-none"></div>}
         </div>
     )
 }
