@@ -917,9 +917,10 @@ const Clientes = () => {
                                             >
                                                 <span className="text-white text-sm flex-1">
                                                     {item.nombre} - ${item.precio.toLocaleString()}
-                                                    {item.precio !== item.precioOriginal && (
-                                                        <span className="text-yellow-400 ml-2">(precio modificado)</span>
-                                                    )}
+                                                    {item.precioOriginal != null &&
+                                                        Number(item.precio) !== Number(item.precioOriginal) && (
+                                                            <span className="text-yellow-400 ml-2">(precio modificado)</span>
+                                                        )}
                                                 </span>
                                                 <div className="flex items-center space-x-2">
                                                     <div className="flex items-center border border-slate-600 rounded h-10 sm:h-auto">
@@ -1058,9 +1059,10 @@ const Clientes = () => {
                                             >
                                                 <span className="text-white text-sm flex-1">
                                                     {item.nombre} - ${item.precio.toLocaleString()}
-                                                    {item.precio !== item.precioOriginal && (
-                                                        <span className="text-yellow-400 ml-2">(precio modificado)</span>
-                                                    )}
+                                                    {item.precioOriginal != null &&
+                                                        Number(item.precio) !== Number(item.precioOriginal) && (
+                                                            <span className="text-yellow-400 ml-2">(precio modificado)</span>
+                                                        )}
                                                 </span>
                                                 <div className="flex items-center space-x-2">
                                                     <div className="flex items-center border border-slate-600 rounded h-10 sm:h-auto">

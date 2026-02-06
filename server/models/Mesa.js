@@ -8,7 +8,7 @@ const mesaSchema = new mongoose.Schema({
     },
     nombre: {
         type: String,
-        required: true,
+        default: '',
         trim: true
     },
     x: {

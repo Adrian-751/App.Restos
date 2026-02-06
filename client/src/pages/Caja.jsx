@@ -149,7 +149,7 @@ const Caja = () => {
                                 </p>
                             </div>
                             <div className="card bg-gradient-to-br from-fuxia-primary to-fuxia-dark">
-                                <p className="text-fuxia-light text-sm mb-2">Total</p>
+                                <p className="text-fuchsia-200 text-sm mb-2">Total</p>
                                 <p className="text-2xl sm:text-3xl font-bold text-white">
                                     ${resumen.total.toLocaleString()}
                                 </p>
