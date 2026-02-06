@@ -119,7 +119,7 @@ const Productos = () => {
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h3 className="text-lg font-bold text-white">#{producto.numero}</h3>
-                                <p className="text-xl text-fuxia-light">{producto.nombre}</p>
+                                <p className="text-xl text-white">{producto.nombre}</p>
                             </div>
                             <span className="px-2 py-1 bg-slate-700 rounded text-xs text-slate-300">
                                 {producto.categoria}

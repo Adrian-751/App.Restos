@@ -121,7 +121,7 @@ const Panel = () => {
                 <div className="card bg-gradient-to-br from-orange-600 to-orange-800">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-fuxia-light text-sm">Estado de Caja</p>
+                            <p className="text-blue-200 text-sm">Estado de Caja</p>
                             <p className="text-2xl font-bold text-white mt-1">
                                 {stats.cajaAbierta ? 'Abierta' : 'Cerrada'}
                             </p>
