@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import api from '../utils/api'
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
+import { toastError } from '../utils/toast'
+import { useModalHotkeys } from '../hooks/useModalHotkeys'
 
 const Productos = () => {
     const [productos, setProductos] = useState([])
@@ -72,10 +74,10 @@ const Productos = () => {
             setEditingProducto(null)
             fetchProductos()
         } catch (error) {
-            const errorMsg = error.response?.data?.error || 
-                           error.response?.data?.errors?.[0]?.msg || 
-                           'Error al guardar el producto'
-            alert(errorMsg)
+            const errorMsg = error.response?.data?.error ||
+                error.response?.data?.errors?.[0]?.msg ||
+                'Error al guardar el producto'
+            toastError(errorMsg)
         }
     }
 
@@ -88,7 +90,7 @@ const Productos = () => {
             fetchProductos()
         } catch (error) {
             const errorMsg = error.response?.data?.error || error.message || 'Error al actualizar el stock'
-            alert(errorMsg)
+            toastError(errorMsg)
         }
     }
 
@@ -99,9 +101,16 @@ const Productos = () => {
             fetchProductos()
         } catch (error) {
             const errorMsg = error.response?.data?.error || error.message || 'Error al eliminar el producto'
-            alert(errorMsg)
+            toastError(errorMsg)
         }
     }
+
+    // Hotkeys modal: ESC = cancelar, ENTER = guardar
+    useModalHotkeys({
+        isOpen: showModal,
+        onCancel: () => { setShowModal(false); setEditingProducto(null) },
+        onConfirm: saveProducto,
+    })
 
 
     return (
@@ -183,7 +192,7 @@ const Productos = () => {
                         <h3 className="text-xl font-bold text-white mb-4">
                             {editingProducto ? 'Editar Producto' : 'Nuevo Producto'}
                         </h3>
-                <div className="space-y-4">
+                        <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-2">
                                     Número ID

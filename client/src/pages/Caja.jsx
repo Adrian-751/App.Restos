@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../utils/api'
+import { toastError, toastInfo, toastSuccess } from '../utils/toast'
 
 const Caja = () => {
     const [montoInicial, setMontoInicial] = useState('')
@@ -24,7 +25,7 @@ const Caja = () => {
 
     useEffect(() => {
         fetchCaja()
-        
+
         // Escuchar eventos de actualización de caja
         const handleCajaUpdate = () => {
             fetchCaja()
@@ -60,7 +61,7 @@ const Caja = () => {
 
     const abrirCaja = async () => {
         if (!montoInicial || parseFloat(montoInicial) < 0) {
-            alert('Por favor ingrese un monto inicial válido')
+            toastInfo('Por favor ingrese un monto inicial válido')
             return
         }
         try {
@@ -69,7 +70,7 @@ const Caja = () => {
             fetchCaja()
         } catch (error) {
             const mensaje = error.response?.data?.error || error.message || 'Error al abrir la caja'
-            alert(`Error al abrir la caja: ${mensaje}`)
+            toastError(`Error al abrir la caja: ${mensaje}`)
         }
     }
 
@@ -78,10 +79,10 @@ const Caja = () => {
         try {
             await api.post('/caja/cerrar', { id: caja._id })
             fetchCaja()
-            alert('Caja cerrada correctamente')
+            toastSuccess('Caja cerrada')
         } catch (error) {
             const errorMsg = error.response?.data?.error || error.message || 'Error al cerrar la caja'
-            alert(errorMsg)
+            toastError(errorMsg)
         }
     }
 

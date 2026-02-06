@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../utils/api'
+import { toastError, toastSuccess } from '../utils/toast'
 
 const Historico = () => {
     const [historico, setHistorico] = useState([])
@@ -38,10 +39,10 @@ const Historico = () => {
         try {
             await api.delete(`/historico/${id}`)
             fetchHistorico()
-            alert('Item eliminado correctamente')
+            toastSuccess('Item eliminado')
         } catch (error) {
             const mensaje = error.response?.data?.error || error.message || 'Error al eliminar el item'
-            alert(`Error al eliminar el item: ${mensaje}`)
+            toastError(`Error al eliminar el item: ${mensaje}`)
         }
     }
 
@@ -59,7 +60,7 @@ const Historico = () => {
         if (item.tipo === 'turno') {
             return `Turno #${item.numero}${item.nombre ? ` - ${item.nombre}` : ''}`
         }
-        
+
         // Es un pedido
         if (item.mesaNombre && item.mesaNumero) {
             return `Mesa ${item.mesaNumero} - ${item.mesaNombre}`

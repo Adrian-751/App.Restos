@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import api from '../utils/api'
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
+import { toastError, toastInfo, toastSuccess } from '../utils/toast'
+import { useModalHotkeys } from '../hooks/useModalHotkeys'
 
 const Mesas = () => {
     const [mesas, setMesas] = useState([])
@@ -38,6 +40,7 @@ const Mesas = () => {
         mesaId: '',
         items: [],
     })
+    const [editingPedidoId, setEditingPedidoId] = useState(null)
     const [selectedProducto, setSelectedProducto] = useState(null)
     const [cantidad, setCantidad] = useState(1)
     const [precioPersonalizado, setPrecioPersonalizado] = useState('')
@@ -210,7 +213,7 @@ const Mesas = () => {
         } catch (error) {
             console.error('Error updating mesa position:', error)
             const errorMsg = error.response?.data?.error || error.message || 'Error al actualizar la posición'
-            alert(errorMsg)
+            toastError(errorMsg)
         }
     }
 
@@ -247,7 +250,7 @@ const Mesas = () => {
         } catch (error) {
             console.error('Error saving mesa:', error)
             const errorMsg = error.response?.data?.error || error.message || 'Error al guardar la mesa'
-            alert(errorMsg)
+            toastError(errorMsg)
         }
     }
 
@@ -279,14 +282,42 @@ const Mesas = () => {
     }
 
     // Funciones para el modal de nuevo pedido
-    const openPedidoModal = (mesaId = '') => {
-        setPedidoFormData({
-            mesaId: mesaId,
-            items: [],
-        })
+    const openPedidoModal = async (mesaId = '') => {
+        setEditingPedidoId(null)
+        setPedidoFormData({ mesaId, items: [] })
         setSelectedProducto(null)
         setCantidad(1)
         setPrecioPersonalizado('')
+
+        // Si abrimos desde una mesa, intentar reutilizar el pedido pendiente existente
+        if (mesaId) {
+            try {
+                const res = await api.get('/pedidos')
+                const pedidosArray = Array.isArray(res.data) ? res.data : []
+                const candidatos = pedidosArray.filter((p) => {
+                    if (!p) return false
+                    const mid = typeof p.mesaId === 'object' && p.mesaId !== null ? p.mesaId._id : p.mesaId
+                    if (!mid) return false
+                    if (String(mid) !== String(mesaId)) return false
+                    const est = String(p.estado || '').toLowerCase()
+                    return est !== 'cobrado' && est !== 'cancelado'
+                })
+                const existente = candidatos.sort(
+                    (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+                )[0]
+                if (existente?._id) {
+                    setEditingPedidoId(existente._id)
+                    setPedidoFormData({
+                        mesaId,
+                        items: Array.isArray(existente.items) ? existente.items : [],
+                    })
+                    toastInfo('Pedido existente cargado')
+                }
+            } catch (error) {
+                console.error('Error buscando pedido existente:', error)
+            }
+        }
+
         setShowPedidoModal(true)
     }
 
@@ -318,7 +349,7 @@ const Mesas = () => {
             setPrecioPersonalizado('')
         } catch (error) {
             console.error('Error adding item:', error)
-            alert('Error al agregar el producto')
+            toastError('Error al agregar el producto')
         }
     }
 
@@ -370,14 +401,19 @@ const Mesas = () => {
                 }
             }
 
-            await api.post('/pedidos', data)
+            if (editingPedidoId) {
+                await api.put(`/pedidos/${editingPedidoId}`, data)
+            } else {
+                await api.post('/pedidos', data)
+            }
             setShowPedidoModal(false)
             setPedidoFormData({ mesaId: '', items: [] })
-            alert('Pedido creado correctamente')
+            setEditingPedidoId(null)
+            toastSuccess('Pedido guardado')
         } catch (error) {
             console.error('Error saving pedido:', error)
             const errorMsg = error.response?.data?.error || error.message || 'Error al guardar el pedido'
-            alert(errorMsg)
+            toastError(errorMsg)
         }
     }
 
@@ -386,6 +422,18 @@ const Mesas = () => {
         e.stopPropagation()
         openPedidoModal(mesa._id)
     }
+
+    // Hotkeys modales: ESC = cancelar, ENTER = guardar
+    useModalHotkeys({
+        isOpen: showModal,
+        onCancel: () => { setShowModal(false); setEditingMesa(null) },
+        onConfirm: saveMesa,
+    })
+    useModalHotkeys({
+        isOpen: showPedidoModal,
+        onCancel: () => { setShowPedidoModal(false); setPedidoFormData({ mesaId: '', items: [] }); setEditingPedidoId(null) },
+        onConfirm: savePedido,
+    })
 
     return (
         <div className="space-y-6">

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import api from '../utils/api'
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
+import { toastError, toastInfo, toastSuccess } from '../utils/toast'
+import { useModalHotkeys } from '../hooks/useModalHotkeys'
 
 const Clientes = () => {
     const [clientes, setClientes] = useState([])
@@ -123,7 +125,7 @@ const Clientes = () => {
             const errorMsg = error.response?.data?.error ||
                 error.response?.data?.errors?.[0]?.msg ||
                 'Error al guardar el cliente'
-            alert(errorMsg)
+            toastError(errorMsg)
         }
     }
 
@@ -141,7 +143,7 @@ const Clientes = () => {
             fetchClientes()
         } catch (error) {
             const errorMsg = error.response?.data?.error || error.message || 'Error al registrar el pago'
-            alert(errorMsg)
+            toastError(errorMsg)
         }
     }
 
@@ -188,10 +190,10 @@ const Clientes = () => {
             if (clienteParaPedido) {
                 fetchPedidosCliente(clienteParaPedido._id)
             }
-            alert('Pedido actualizado correctamente')
+            toastSuccess('Pedido actualizado')
         } catch (error) {
             console.error('Error updating pedido:', error)
-            alert('Error al actualizar el pedido')
+            toastError('Error al actualizar el pedido')
         }
     }
 
@@ -239,14 +241,14 @@ const Clientes = () => {
             }
             window.dispatchEvent(new Event('caja-updated'))
             if (estadoFinal === 'Cobrado') {
-                alert('Pedido cobrado correctamente. La caja se ha actualizado.')
+                toastSuccess('Pedido cobrado. Caja actualizada.')
             } else {
                 const restante = totalPedido - totalPagado
-                alert(`Pago registrado. Restante: $${restante.toLocaleString()}`)
+                toastInfo(`Pago registrado. Restante: $${restante.toLocaleString()}`)
             }
         } catch (error) {
             console.error('Error cobrando pedido:', error)
-            alert('Error al cobrar el pedido')
+            toastError('Error al cobrar el pedido')
         }
     }
 
@@ -274,7 +276,7 @@ const Clientes = () => {
             }
         } catch (error) {
             console.error('Error deleting pedido:', error)
-            alert('Error al eliminar el pedido')
+            toastError('Error al eliminar el pedido')
         }
     }
 
@@ -285,7 +287,7 @@ const Clientes = () => {
             fetchClientes()
         } catch (error) {
             console.error('Error deleting cliente:', error)
-            alert('Error al eliminar el cliente')
+            toastError('Error al eliminar el cliente')
         }
     }
 
@@ -364,7 +366,7 @@ const Clientes = () => {
 
             // Verificar si hay pedidos pendientes
             if (pedidosDelCliente.length === 0) {
-                alert('No hay pedidos pendientes')
+                toastInfo('No hay pedidos pendientes')
                 return
             }
 
@@ -378,7 +380,7 @@ const Clientes = () => {
 
             // Si no hay items, también mostrar el mensaje
             if (todosLosItems.length === 0) {
-                alert('No hay pedidos pendientes')
+                toastInfo('No hay pedidos pendientes')
                 return
             }
 
@@ -390,7 +392,7 @@ const Clientes = () => {
             setShowEditPedidosClienteModal(true)
         } catch (error) {
             console.error('Error fetching pedidos:', error)
-            alert('Error al cargar los pedidos del cliente')
+            toastError('Error al cargar los pedidos del cliente')
         }
     }
 
@@ -460,7 +462,7 @@ const Clientes = () => {
             const clientesRes = await api.get('/clientes')
             const cliente = clientesRes.data.find(c => c._id === clienteEditandoPedidos._id)
             if (!cliente) {
-                alert('Cliente no encontrado')
+                toastError('Cliente no encontrado')
                 return
             }
 
@@ -489,20 +491,20 @@ const Clientes = () => {
             setShowEditPedidosClienteModal(false)
             setClienteEditandoPedidos(null)
             fetchClientes()
-            alert('Pedidos actualizados correctamente')
+            toastSuccess('Pedidos actualizados')
         } catch (error) {
             console.error('Error updating pedidos:', error)
-            alert('Error al actualizar los pedidos')
+            toastError('Error al actualizar los pedidos')
         }
     }
 
     const saveNuevoPedido = async () => {
         if (!pedidoFormData.clienteId) {
-            alert('Debes seleccionar un cliente')
+            toastInfo('Debes seleccionar un cliente')
             return
         }
         if (pedidoFormData.items.length === 0) {
-            alert('Debes agregar al menos un producto al pedido')
+            toastInfo('Debes agregar al menos un producto al pedido')
             return
         }
 
@@ -516,12 +518,44 @@ const Clientes = () => {
             setShowNuevoPedidoModal(false)
             setClienteParaPedido(null)
             fetchClientes() // Actualizar la cuenta corriente del cliente
-            alert('Pedido agregado a cuenta corriente correctamente')
+            toastSuccess('Pedido agregado a cuenta corriente')
         } catch (error) {
             console.error('Error saving pedido:', error)
-            alert('Error al guardar el pedido')
+            toastError('Error al guardar el pedido')
         }
     }
+
+    // Hotkeys modales: ESC = cancelar, ENTER = confirmar
+    useModalHotkeys({
+        isOpen: showModal,
+        onCancel: () => { setShowModal(false); setEditingCliente(null) },
+        onConfirm: saveCliente,
+    })
+    useModalHotkeys({
+        isOpen: showPagoModal,
+        onCancel: () => { setShowPagoModal(false); setSelectedCliente(null) },
+        onConfirm: savePago,
+    })
+    useModalHotkeys({
+        isOpen: showEditPedidoModal,
+        onCancel: () => { setShowEditPedidoModal(false); setPedidoEditando(null) },
+        onConfirm: saveEditPedido,
+    })
+    useModalHotkeys({
+        isOpen: showCobroModal,
+        onCancel: () => { setShowCobroModal(false); setPedidoACobrar(null) },
+        onConfirm: confirmarCobroCliente,
+    })
+    useModalHotkeys({
+        isOpen: showNuevoPedidoModal,
+        onCancel: () => { setShowNuevoPedidoModal(false); setClienteParaPedido(null) },
+        onConfirm: saveNuevoPedido,
+    })
+    useModalHotkeys({
+        isOpen: showEditPedidosClienteModal,
+        onCancel: () => { setShowEditPedidosClienteModal(false); setClienteEditandoPedidos(null) },
+        onConfirm: saveEditPedidosCliente,
+    })
 
 
 
@@ -888,10 +922,10 @@ const Clientes = () => {
                                                     )}
                                                 </span>
                                                 <div className="flex items-center space-x-2">
-                                                        <div className="flex items-center border border-slate-600 rounded h-10 sm:h-auto">
+                                                    <div className="flex items-center border border-slate-600 rounded h-10 sm:h-auto">
                                                         <button
                                                             onClick={() => updateItemQuantityPedido(idx, item.cantidad - 1)}
-                                                                className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
+                                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                                             type="button"
                                                         >
                                                             -
@@ -901,11 +935,11 @@ const Clientes = () => {
                                                             value={item.cantidad}
                                                             onChange={(e) => updateItemQuantityPedido(idx, e.target.value)}
                                                             min="1"
-                                                                className="w-12 h-10 sm:h-auto text-center text-white bg-slate-700 border-0 focus:outline-none focus:ring-0 leading-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                            className="w-12 h-10 sm:h-auto text-center text-white bg-slate-700 border-0 focus:outline-none focus:ring-0 leading-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                         />
                                                         <button
                                                             onClick={() => updateItemQuantityPedido(idx, item.cantidad + 1)}
-                                                                className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
+                                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                                             type="button"
                                                         >
                                                             +
@@ -1029,10 +1063,10 @@ const Clientes = () => {
                                                     )}
                                                 </span>
                                                 <div className="flex items-center space-x-2">
-                                                        <div className="flex items-center border border-slate-600 rounded h-10 sm:h-auto">
+                                                    <div className="flex items-center border border-slate-600 rounded h-10 sm:h-auto">
                                                         <button
                                                             onClick={() => updateItemQuantityEditPedidos(idx, item.cantidad - 1)}
-                                                                className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
+                                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                                             type="button"
                                                         >
                                                             -
@@ -1042,11 +1076,11 @@ const Clientes = () => {
                                                             value={item.cantidad}
                                                             onChange={(e) => updateItemQuantityEditPedidos(idx, e.target.value)}
                                                             min="1"
-                                                                className="w-12 h-10 sm:h-auto text-center text-white bg-slate-700 border-0 focus:outline-none focus:ring-0 leading-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                            className="w-12 h-10 sm:h-auto text-center text-white bg-slate-700 border-0 focus:outline-none focus:ring-0 leading-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                         />
                                                         <button
                                                             onClick={() => updateItemQuantityEditPedidos(idx, item.cantidad + 1)}
-                                                                className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
+                                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                                             type="button"
                                                         >
                                                             +

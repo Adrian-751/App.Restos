@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import ToastHost from './ToastHost'
 
 const Layout = ({ children }) => {
     const location = useLocation()
@@ -25,6 +26,7 @@ const Layout = ({ children }) => {
 
     return (
         <div className="min-h-screen bg-dark-bg relative overflow-x-hidden">
+            <ToastHost />
             {/* Watermark global (NO en Mesas para no afectar el mapa) */}
             {showWatermark && (
                 <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center">

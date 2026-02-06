@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import api from '../utils/api'
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
+import { toastError, toastInfo, toastSuccess } from '../utils/toast'
+import { useModalHotkeys } from '../hooks/useModalHotkeys'
 
 const Pedidos = () => {
     const [pedidos, setPedidos] = useState([])
@@ -117,7 +119,7 @@ const Pedidos = () => {
 
     const updateItemQuantity = (index, newCantidad) => {
         if (newCantidad < 1) return
-        const updatedItems = formData.items.map((item, i) => 
+        const updatedItems = formData.items.map((item, i) =>
             i === index ? { ...item, cantidad: parseInt(newCantidad) } : item
         )
         setFormData({
@@ -165,7 +167,7 @@ const Pedidos = () => {
             fetchPedidos()
         } catch (error) {
             const errorMsg = error.response?.data?.error || error.message || 'Error al guardar el pedido'
-            alert(errorMsg)
+            toastError(errorMsg)
         }
     }
 
@@ -190,7 +192,7 @@ const Pedidos = () => {
         const transferenciaExistente = parseFloat(pedidoACobrar.transferencia) || 0
         const nuevoEfectivo = parseFloat(cobroData.efectivo) || 0
         const nuevaTransferencia = parseFloat(cobroData.transferencia) || 0
-        
+
         const totalPagado = efectivoExistente + transferenciaExistente + nuevoEfectivo + nuevaTransferencia
         const totalPedido = parseFloat(pedidoACobrar.total) || 0
 
@@ -214,15 +216,15 @@ const Pedidos = () => {
             fetchPedidos()
             window.dispatchEvent(new Event('caja-updated'))
             if (estadoFinal === 'Cobrado') {
-                alert('Pedido cobrado correctamente. La caja se ha actualizado.')
+                toastSuccess('Pedido cobrado. Caja actualizada.')
             } else {
                 const restante = totalPedido - totalPagado
-                alert(`Pago registrado. Restante: $${restante.toLocaleString()}`)
+                toastInfo(`Pago registrado. Restante: $${restante.toLocaleString()}`)
             }
         } catch (error) {
             console.error('Error cobrando pedido:', error)
             const mensaje = error.response?.data?.error || error.message || 'Error al cobrar el pedido'
-            alert(`Error al cobrar el pedido: ${mensaje}`)
+            toastError(`Error al cobrar el pedido: ${mensaje}`)
         }
     }
 
@@ -233,9 +235,21 @@ const Pedidos = () => {
             fetchPedidos()
         } catch (error) {
             console.error('Error deleting pedido:', error)
-            alert('Error al eliminar el pedido')
+            toastError('Error al eliminar el pedido')
         }
     }
+
+    // Hotkeys modales: ESC = cancelar, ENTER = confirmar
+    useModalHotkeys({
+        isOpen: showModal,
+        onCancel: () => { setShowModal(false); setEditingPedido(null) },
+        onConfirm: savePedido,
+    })
+    useModalHotkeys({
+        isOpen: showCobroModal,
+        onCancel: () => { setShowCobroModal(false); setPedidoACobrar(null) },
+        onConfirm: confirmarCobro,
+    })
 
     return (
         <div className="space-y-6">
@@ -359,7 +373,7 @@ const Pedidos = () => {
                         <h3 className="text-xl font-bold text-white mb-4">
                             {editingPedido ? 'Editar Pedido' : 'Nuevo Pedido'}
                         </h3>
-                <div className="space-y-4">
+                        <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-2">
                                     Mesa (opcional)
@@ -531,7 +545,7 @@ const Pedidos = () => {
                                 const nuevaTransferencia = parseFloat(cobroData.transferencia) || 0
                                 const totalNuevoPago = nuevoEfectivo + nuevaTransferencia
                                 const restante = totalACobrar - totalNuevoPago
-                                
+
                                 return (
                                     <>
                                         <div className="bg-slate-700 p-3 rounded-lg">

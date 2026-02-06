@@ -12,17 +12,17 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-md' }) => {
     if (!isOpen) return null;
 
     return (
-        <div 
+        <div
             className="fixed inset-0 bg-black/50 z-[60] p-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center"
             onClick={onClose}
         >
-            <div 
+            <div
                 className={`card bg-slate-800 ${maxWidth} w-full mx-4 max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] overflow-y-auto`}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold text-white">{title}</h3>
-                    <button 
+                    <button
                         onClick={onClose}
                         className="text-slate-400 hover:text-white text-2xl leading-none"
                     >

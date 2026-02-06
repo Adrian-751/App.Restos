@@ -32,8 +32,8 @@ const Panel = () => {
                 const fechaTurno = new Date(t.createdAt).toISOString().split("T")[0];
                 return fechaTurno === hoy && t.estado?.toLowerCase() === 'cobrado';
             });
-            const cantidadTurnos = turnosHoy.length;
-            const totalTurnos = turnosHoy.reduce((sum, t) => sum + (parseFloat(t.total) || 0), 0);
+            const cantidadTurnosDesdeTurnos = turnosHoy.length;
+            const totalTurnosDesdeTurnos = turnosHoy.reduce((sum, t) => sum + (parseFloat(t.total) || 0), 0);
 
             // Si la caja está cerrada, calcular el monto total (monto inicial + total del día)
             let montoCajaCerrada = null;
@@ -44,6 +44,36 @@ const Panel = () => {
 
             const mesasArray = Array.isArray(mesas.data) ? mesas.data : []
             const pedidosArray = Array.isArray(pedidos.data) ? pedidos.data : []
+
+            // También permitir contar "turnos" vendidos como producto desde Pedidos,
+            // pero SOLO si el producto se llama "Turno Futbol".
+            const TURNO_PRODUCTO_NOMBRE = 'turno futbol'
+            const pedidosCobradosHoy = pedidosArray.filter((p) => {
+                if (!p || !p.createdAt) return false
+                const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                return fechaPedido === hoy && p.estado === 'Cobrado'
+            })
+
+            const turnosDesdePedidos = pedidosCobradosHoy.reduce(
+                (acc, p) => {
+                    const items = Array.isArray(p.items) ? p.items : []
+                    for (const it of items) {
+                        const nombre = String(it?.nombre || '').trim().toLowerCase()
+                        if (nombre !== TURNO_PRODUCTO_NOMBRE) continue
+                        const cantidad = Number(it?.cantidad || 0)
+                        const subtotal = Number(
+                            it?.subtotal ?? ((Number(it?.precio || 0) * cantidad) || 0)
+                        )
+                        acc.cantidad += cantidad
+                        acc.total += subtotal
+                    }
+                    return acc
+                },
+                { cantidad: 0, total: 0 }
+            )
+
+            const cantidadTurnos = cantidadTurnosDesdeTurnos + turnosDesdePedidos.cantidad
+            const totalTurnos = totalTurnosDesdeTurnos + turnosDesdePedidos.total
 
             setStats({
                 cajaAbierta: !!caja.data,

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import api from '../utils/api'
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
+import { toastError, toastInfo, toastSuccess } from '../utils/toast'
+import { useModalHotkeys } from '../hooks/useModalHotkeys'
 
 const Turnos = () => {
     const [turnos, setTurnos] = useState([])
@@ -34,7 +36,7 @@ const Turnos = () => {
         fetchPedidos()
         fetchMesas()
         fetchClientes()
-        
+
         // Escuchar eventos de actualización
         const handleUpdate = () => {
             fetchTurnos()
@@ -92,7 +94,7 @@ const Turnos = () => {
             // Si solo tiene pedidoId, mantenerlo como está
             let asignacionTipo = ''
             let asignacionId = ''
-            
+
             if (turno.mesaId) {
                 asignacionTipo = 'mesa'
                 asignacionId = typeof turno.mesaId === 'object' ? turno.mesaId._id : turno.mesaId
@@ -100,7 +102,7 @@ const Turnos = () => {
                 asignacionTipo = 'cliente'
                 asignacionId = typeof turno.clienteId === 'object' ? turno.clienteId._id : turno.clienteId
             }
-            
+
             setFormData({
                 nombre: turno.nombre || '',
                 asignacionTipo: asignacionTipo,
@@ -130,7 +132,7 @@ const Turnos = () => {
     const saveTurno = async () => {
         try {
             const total = parseFloat(formData.total) || 0
-            
+
             const data = {
                 nombre: formData.nombre,
                 total: total,
@@ -138,7 +140,7 @@ const Turnos = () => {
                 transferencia: parseFloat(formData.transferencia) || 0,
                 observaciones: formData.observaciones || '',
             }
-            
+
             // Si hay asignación (mesa o cliente), usar esa
             if (formData.asignacionTipo === 'mesa' && formData.asignacionId) {
                 data.mesaId = formData.asignacionId
@@ -164,14 +166,14 @@ const Turnos = () => {
             } else {
                 await api.post('/turnos', data)
             }
-            
+
             setShowModal(false)
             setEditingTurno(null)
             fetchTurnos()
             window.dispatchEvent(new Event('turno-updated'))
         } catch (error) {
             const errorMsg = error.response?.data?.error || error.message || 'Error al guardar el turno'
-            alert(errorMsg)
+            toastError(errorMsg)
         }
     }
 
@@ -193,7 +195,7 @@ const Turnos = () => {
         const transferenciaExistente = parseFloat(turnoACobrar.transferencia) || 0
         const nuevoEfectivo = parseFloat(cobroData.efectivo) || 0
         const nuevaTransferencia = parseFloat(cobroData.transferencia) || 0
-        
+
         const totalPagado = efectivoExistente + transferenciaExistente + nuevoEfectivo + nuevaTransferencia
         const totalTurno = parseFloat(turnoACobrar.total) || 0
 
@@ -218,38 +220,50 @@ const Turnos = () => {
             window.dispatchEvent(new Event('caja-updated'))
             window.dispatchEvent(new Event('turno-updated'))
             if (estadoFinal === 'Cobrado') {
-                alert('Turno cobrado correctamente. La caja se ha actualizado.')
+                toastSuccess('Turno cobrado. Caja actualizada.')
             } else {
                 const restante = totalTurno - totalPagado
-                alert(`Pago registrado. Restante: $${restante.toLocaleString()}`)
+                toastInfo(`Pago registrado. Restante: $${restante.toLocaleString()}`)
             }
         } catch (error) {
             console.error('Error cobrando turno:', error)
             const mensaje = error.response?.data?.error || error.message || 'Error al cobrar el turno'
-            alert(`Error al cobrar el turno: ${mensaje}`)
+            toastError(`Error al cobrar el turno: ${mensaje}`)
         }
     }
 
     const deleteTurno = async (id) => {
         // Buscar el turno para verificar su estado
         const turno = turnos.find(t => t._id === id)
-        
+
         // Mensaje diferente para turnos cobrados
-        const mensajeConfirmacion = turno && turno.estado === 'Cobrado' 
+        const mensajeConfirmacion = turno && turno.estado === 'Cobrado'
             ? '¿Eliminar este turno de la sección Turnos? (Permanecerá visible en Histórico)'
             : '¿Eliminar este turno?'
-        
+
         if (!window.confirm(mensajeConfirmacion)) return
-        
+
         try {
             await api.delete(`/turnos/${id}`)
             fetchTurnos()
             window.dispatchEvent(new Event('turno-updated'))
         } catch (error) {
             const mensaje = error.response?.data?.error || error.message || 'Error al eliminar el turno'
-            alert(mensaje)
+            toastError(mensaje)
         }
     }
+
+    // Hotkeys modales: ESC = cancelar, ENTER = confirmar
+    useModalHotkeys({
+        isOpen: showModal,
+        onCancel: () => { setShowModal(false); setEditingTurno(null) },
+        onConfirm: saveTurno,
+    })
+    useModalHotkeys({
+        isOpen: showCobroModal,
+        onCancel: () => { setShowCobroModal(false); setTurnoACobrar(null) },
+        onConfirm: confirmarCobro,
+    })
 
     const getPedidoInfo = (pedidoId) => {
         if (!Array.isArray(pedidos) || !pedidoId) return null
@@ -259,7 +273,7 @@ const Turnos = () => {
 
     const getOpcionesAsignacion = () => {
         const opciones = []
-        
+
         if (!Array.isArray(mesas) || !Array.isArray(clientes)) {
             return opciones
         }
@@ -312,111 +326,111 @@ const Turnos = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {turnos.map((turno) => (
-                                <div key={turno._id} className="card">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h3 className="text-lg font-bold text-white">
-                                                Turno #{turno.numero || 'N/A'} {turno.nombre ? `- ${turno.nombre}` : ''}
-                                            </h3>
-                                            <p className="text-sm text-slate-400">
-                                                {turno.createdAt ? new Date(turno.createdAt).toLocaleString() : 'Sin fecha'}
-                                            </p>
-                                        </div>
-                                        <span
-                                            className={`px-2 py-1 rounded text-xs ${turno.estado === 'Cobrado'
-                                                ? 'bg-green-600 text-white'
-                                                : 'bg-yellow-600 text-white'
-                                                }`}
-                                        >
-                                            {turno.estado || 'Pendiente'}
-                                        </span>
-                                    </div>
-
-                                    {/* Información de la asignación (mesa, cliente o pedido) */}
-                                    {(turno.mesaNumero || turno.clienteNombre || turno.pedidoId) && (
-                                        <div className="mb-3 pb-3 border-b border-slate-700">
-                                            <p className="text-xs text-slate-400 mb-1">Asignado a:</p>
-                                            {turno.mesaNumero && (
-                                                <p className="text-sm text-white">
-                                                    Mesa {turno.mesaNumero}
-                                                    {turno.mesaNombre && ` - ${turno.mesaNombre}`}
-                                                </p>
-                                            )}
-                                            {turno.clienteNombre && (
-                                                <p className="text-sm text-white">
-                                                    Cliente #{turno.clienteNumero || ''} - {turno.clienteNombre}
-                                                </p>
-                                            )}
-                                            {turno.pedidoInfo && (
-                                                <p className="text-xs text-slate-400 mt-1">
-                                                    Pedido Total: ${turno.pedidoInfo.total?.toLocaleString()}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    <div className="border-t border-slate-700 pt-4 space-y-2">
-                                        <div className="flex justify-between text-lg font-bold text-white">
-                                            <span>Total:</span>
-                                            <span>${(turno.total || 0).toLocaleString()}</span>
-                                        </div>
-                                        {(turno.efectivo || 0) > 0 && (
-                                            <div className="flex justify-between text-sm text-slate-300">
-                                                <span>Efectivo:</span>
-                                                <span>${(turno.efectivo || 0).toLocaleString()}</span>
-                                            </div>
-                                        )}
-                                        {(turno.transferencia || 0) > 0 && (
-                                            <div className="flex justify-between text-sm text-slate-300">
-                                                <span>Transferencia:</span>
-                                                <span>${(turno.transferencia || 0).toLocaleString()}</span>
-                                            </div>
-                                        )}
-                                        {(() => {
-                                            const totalPagado = (parseFloat(turno.efectivo) || 0) + (parseFloat(turno.transferencia) || 0);
-                                            const totalTurno = parseFloat(turno.total) || 0;
-                                            const restante = totalTurno - totalPagado;
-                                            return ((turno.efectivo || 0) > 0 || (turno.transferencia || 0) > 0) && restante > 0 ? (
-                                                <div className="flex justify-between text-sm text-red-400 font-semibold">
-                                                    <span>Restante:</span>
-                                                    <span>${restante.toLocaleString()}</span>
-                                                </div>
-                                            ) : null;
-                                        })()}
-                                    </div>
-
-                                    {turno.observaciones && (
-                                        <div className="mt-3 pt-3 border-b border-slate-700">
-                                            <p className="text-xs text-slate-400 mb-1">Observaciones:</p>
-                                            <p className="text-sm text-slate-300">{turno.observaciones}</p>
-                                        </div>
-                                    )}
-
-                                    <div className="flex flex-col sm:flex-row gap-2 mt-4">
-                                        {turno.estado !== 'Cobrado' && (
-                                            <>
-                                                <button
-                                                    onClick={() => openEditModal(turno)}
-                                                    className="btn-secondary w-full sm:flex-1 text-sm"
-                                                >
-                                                    Editar
-                                                </button>
-                                                <button
-                                                    onClick={() => cobrarTurno(turno)}
-                                                    className="btn-primary w-full sm:flex-1 text-sm"
-                                                >
-                                                    Cobrar
-                                                </button>
-                                            </>
-                                        )}
-                                        <button
-                                            onClick={() => deleteTurno(turno._id)}
-                                            className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto px-4 py-2 rounded-lg text-sm"
-                                        >
-                                            Eliminar
-                                        </button>
-                                    </div>
+                        <div key={turno._id} className="card">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-white">
+                                        Turno #{turno.numero || 'N/A'} {turno.nombre ? `- ${turno.nombre}` : ''}
+                                    </h3>
+                                    <p className="text-sm text-slate-400">
+                                        {turno.createdAt ? new Date(turno.createdAt).toLocaleString() : 'Sin fecha'}
+                                    </p>
                                 </div>
+                                <span
+                                    className={`px-2 py-1 rounded text-xs ${turno.estado === 'Cobrado'
+                                        ? 'bg-green-600 text-white'
+                                        : 'bg-yellow-600 text-white'
+                                        }`}
+                                >
+                                    {turno.estado || 'Pendiente'}
+                                </span>
+                            </div>
+
+                            {/* Información de la asignación (mesa, cliente o pedido) */}
+                            {(turno.mesaNumero || turno.clienteNombre || turno.pedidoId) && (
+                                <div className="mb-3 pb-3 border-b border-slate-700">
+                                    <p className="text-xs text-slate-400 mb-1">Asignado a:</p>
+                                    {turno.mesaNumero && (
+                                        <p className="text-sm text-white">
+                                            Mesa {turno.mesaNumero}
+                                            {turno.mesaNombre && ` - ${turno.mesaNombre}`}
+                                        </p>
+                                    )}
+                                    {turno.clienteNombre && (
+                                        <p className="text-sm text-white">
+                                            Cliente #{turno.clienteNumero || ''} - {turno.clienteNombre}
+                                        </p>
+                                    )}
+                                    {turno.pedidoInfo && (
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Pedido Total: ${turno.pedidoInfo.total?.toLocaleString()}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="border-t border-slate-700 pt-4 space-y-2">
+                                <div className="flex justify-between text-lg font-bold text-white">
+                                    <span>Total:</span>
+                                    <span>${(turno.total || 0).toLocaleString()}</span>
+                                </div>
+                                {(turno.efectivo || 0) > 0 && (
+                                    <div className="flex justify-between text-sm text-slate-300">
+                                        <span>Efectivo:</span>
+                                        <span>${(turno.efectivo || 0).toLocaleString()}</span>
+                                    </div>
+                                )}
+                                {(turno.transferencia || 0) > 0 && (
+                                    <div className="flex justify-between text-sm text-slate-300">
+                                        <span>Transferencia:</span>
+                                        <span>${(turno.transferencia || 0).toLocaleString()}</span>
+                                    </div>
+                                )}
+                                {(() => {
+                                    const totalPagado = (parseFloat(turno.efectivo) || 0) + (parseFloat(turno.transferencia) || 0);
+                                    const totalTurno = parseFloat(turno.total) || 0;
+                                    const restante = totalTurno - totalPagado;
+                                    return ((turno.efectivo || 0) > 0 || (turno.transferencia || 0) > 0) && restante > 0 ? (
+                                        <div className="flex justify-between text-sm text-red-400 font-semibold">
+                                            <span>Restante:</span>
+                                            <span>${restante.toLocaleString()}</span>
+                                        </div>
+                                    ) : null;
+                                })()}
+                            </div>
+
+                            {turno.observaciones && (
+                                <div className="mt-3 pt-3 border-b border-slate-700">
+                                    <p className="text-xs text-slate-400 mb-1">Observaciones:</p>
+                                    <p className="text-sm text-slate-300">{turno.observaciones}</p>
+                                </div>
+                            )}
+
+                            <div className="flex flex-col sm:flex-row gap-2 mt-4">
+                                {turno.estado !== 'Cobrado' && (
+                                    <>
+                                        <button
+                                            onClick={() => openEditModal(turno)}
+                                            className="btn-secondary w-full sm:flex-1 text-sm"
+                                        >
+                                            Editar
+                                        </button>
+                                        <button
+                                            onClick={() => cobrarTurno(turno)}
+                                            className="btn-primary w-full sm:flex-1 text-sm"
+                                        >
+                                            Cobrar
+                                        </button>
+                                    </>
+                                )}
+                                <button
+                                    onClick={() => deleteTurno(turno._id)}
+                                    className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto px-4 py-2 rounded-lg text-sm"
+                                >
+                                    Eliminar
+                                </button>
+                            </div>
+                        </div>
                     ))}
                 </div>
             )}
@@ -428,7 +442,7 @@ const Turnos = () => {
                         <h3 className="text-xl font-bold text-white mb-4">
                             {editingTurno ? 'Editar Turno' : 'Nuevo Turno'}
                         </h3>
-                <div className="space-y-4">
+                        <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-2">
                                     Nombre (opcional)
@@ -580,7 +594,7 @@ const Turnos = () => {
                                     const nuevaTransferencia = parseFloat(cobroData.transferencia) || 0
                                     const totalNuevoPago = nuevoEfectivo + nuevaTransferencia
                                     const restante = totalACobrar - totalNuevoPago
-                                    
+
                                     return (
                                         <>
                                             {totalPagadoAnterior > 0 && (
