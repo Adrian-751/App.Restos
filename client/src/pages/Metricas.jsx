@@ -4,6 +4,7 @@ import api from '../utils/api'
 const Metricas = () => {
     const [metricas, setMetricas] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [tab, setTab] = useState('resumen') // 'resumen' | 'egresos'
 
     const fetchMetricas = async () => {
         try {
@@ -59,14 +60,96 @@ const Metricas = () => {
         <div className="space-y-6">
             <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 sm:mb-6">Métricas</h2>
 
+            <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                    type="button"
+                    onClick={() => setTab('resumen')}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${tab === 'resumen'
+                        ? 'bg-fuxia-primary text-white'
+                        : 'bg-white/10 text-slate-200 hover:bg-white/15'
+                        }`}
+                >
+                    Resumen
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setTab('egresos')}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${tab === 'egresos'
+                        ? 'bg-fuxia-primary text-white'
+                        : 'bg-white/10 text-slate-200 hover:bg-white/15'
+                        }`}
+                >
+                    Total Egresos
+                </button>
+            </div>
+
             {!metricasSemana && !metricasMes && !loading && (
                 <div className="card">
                     <p className="text-white">No hay datos disponibles. Asegúrate de tener pedidos cobrados y cajas registradas.</p>
                 </div>
             )}
 
+            {/* Pestaña: Total Egresos */}
+            {tab === 'egresos' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="card">
+                        <h3 className="text-xl font-bold text-white mb-2">Egresos Semanales</h3>
+                        <p className="text-slate-400 text-sm mb-4">
+                            Del {new Date(metricasSemana?.inicioSemana).toLocaleDateString()} al {new Date(metricasSemana?.finSemana).toLocaleDateString()}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="bg-slate-700 p-4 rounded-lg">
+                                <p className="text-slate-300 text-sm">Efectivo</p>
+                                <p className="text-2xl font-bold text-white">
+                                    ${Number(metricasSemana?.egresos?.efectivo || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </p>
+                            </div>
+                            <div className="bg-slate-700 p-4 rounded-lg">
+                                <p className="text-slate-300 text-sm">Transferencia</p>
+                                <p className="text-2xl font-bold text-white">
+                                    ${Number(metricasSemana?.egresos?.transferencia || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </p>
+                            </div>
+                            <div className="bg-slate-700 p-4 rounded-lg">
+                                <p className="text-slate-300 text-sm">Total</p>
+                                <p className="text-2xl font-bold text-red-300">
+                                    ${Number(metricasSemana?.egresos?.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="card">
+                        <h3 className="text-xl font-bold text-white mb-2">Egresos Mensuales</h3>
+                        <p className="text-slate-400 text-sm mb-4">
+                            {metricasMes?.inicioMes ? formatearMes(metricasMes.inicioMes) : ''}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="bg-slate-700 p-4 rounded-lg">
+                                <p className="text-slate-300 text-sm">Efectivo</p>
+                                <p className="text-2xl font-bold text-white">
+                                    ${Number(metricasMes?.egresos?.efectivo || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </p>
+                            </div>
+                            <div className="bg-slate-700 p-4 rounded-lg">
+                                <p className="text-slate-300 text-sm">Transferencia</p>
+                                <p className="text-2xl font-bold text-white">
+                                    ${Number(metricasMes?.egresos?.transferencia || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </p>
+                            </div>
+                            <div className="bg-slate-700 p-4 rounded-lg">
+                                <p className="text-slate-300 text-sm">Total</p>
+                                <p className="text-2xl font-bold text-red-300">
+                                    ${Number(metricasMes?.egresos?.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Métricas Semanales */}
-            {metricasSemana && (
+            {tab === 'resumen' && metricasSemana && (
                 <div className="card">
                     <h3 className="text-xl font-bold text-white mb-4">
                         Métricas Semanales
@@ -115,7 +198,7 @@ const Metricas = () => {
             )}
 
             {/* Métricas Mensuales */}
-            {metricasMes && (
+            {tab === 'resumen' && metricasMes && (
                 <div className="card">
                     <h3 className="text-xl font-bold text-white mb-4">
                         Métricas Mensuales

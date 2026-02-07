@@ -1,4 +1,5 @@
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { getTodayYMD } from '../utils/date.js'
 
 
 /* Obtener todos los pedidos
@@ -64,6 +65,40 @@ export const updatePedido = asyncHandler(async (req, res) => {
     const estadoAnterior = pedido.estado;
     const estadoNuevo = req.body.estado;
 
+    // 1) Caja: sumar pagos parciales (delta efectivo/transferencia) aunque NO esté Cobrado
+    // Esto permite que Caja/Gestión/Métricas reflejen ingresos en tiempo real.
+    {
+        const prevE = parseFloat(pedido.efectivo) || 0
+        const prevT = parseFloat(pedido.transferencia) || 0
+        const nextE = req.body.efectivo != null ? (parseFloat(req.body.efectivo) || 0) : prevE
+        const nextT = req.body.transferencia != null ? (parseFloat(req.body.transferencia) || 0) : prevT
+        const deltaE = nextE - prevE
+        const deltaT = nextT - prevT
+
+        if (deltaE !== 0 || deltaT !== 0) {
+            const hoy = getTodayYMD()
+            const caja = await Caja.findOne({ fecha: hoy, cerrada: false })
+            if (caja) {
+                caja.totalEfectivo = (caja.totalEfectivo || 0) + deltaE
+                caja.totalTransferencia = (caja.totalTransferencia || 0) + deltaT
+                if (caja.totalEfectivo < 0) caja.totalEfectivo = 0
+                if (caja.totalTransferencia < 0) caja.totalTransferencia = 0
+
+                if (!caja.ventas) caja.ventas = []
+                caja.ventas.push({
+                    pedidoId: pedido._id.toString(),
+                    tipo: 'pedido',
+                    total: (deltaE + deltaT),
+                    efectivo: deltaE,
+                    transferencia: deltaT,
+                    fecha: new Date()
+                })
+
+                await caja.save()
+            }
+        }
+    }
+
     // Si es cuenta corriente (o se asigna/quita cliente), mantener la cuenta corriente sincronizada
     // con el saldo pendiente (total - pagos). Solo aplica mientras NO esté cobrado.
     if (estadoAnterior?.toLowerCase() !== 'cobrado') {
@@ -119,15 +154,12 @@ export const updatePedido = asyncHandler(async (req, res) => {
         estadoAnterior?.toLowerCase() !== 'cobrado') {
 
         // Actualizar caja
-        const hoy = new Date().toISOString().split('T')[0];
+        const hoy = getTodayYMD();
         const caja = await Caja.findOne({ fecha: hoy, cerrada: false });
 
         if (caja) {
             const efectivo = parseFloat(req.body.efectivo) || 0;
             const transferencia = parseFloat(req.body.transferencia) || 0;
-
-            caja.totalEfectivo = (caja.totalEfectivo || 0) + efectivo;
-            caja.totalTransferencia = (caja.totalTransferencia || 0) + transferencia;
 
             if (!caja.ventas) caja.ventas = [];
             caja.ventas.push({

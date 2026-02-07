@@ -56,6 +56,7 @@ export const getMetricasSemana = asyncHandler(async (req, res) => {
 
     const totalEfectivo = totalEfectivoBruto - egresos.efectivo
     const totalTransferencia = totalTransferenciaBruto - egresos.transferencia
+    const totalEgresos = egresos.efectivo + egresos.transferencia
 
     // Turnos cobrados (Turno model) + Turno Futbol vendido como item de pedido
     const turnosSemana = await Turno.find({
@@ -97,6 +98,7 @@ export const getMetricasSemana = asyncHandler(async (req, res) => {
         totalTransferencia,
         totalVentas,
         total: totalEfectivo + totalTransferencia,
+        egresos: { ...egresos, total: totalEgresos },
         turnos,
         cantidadPedidos,
         cantidadCajas: cajasSemana.length
@@ -152,6 +154,7 @@ export const getMetricasMes = asyncHandler(async (req, res) => {
 
     const totalEfectivo = totalEfectivoBruto - egresos.efectivo
     const totalTransferencia = totalTransferenciaBruto - egresos.transferencia
+    const totalEgresos = egresos.efectivo + egresos.transferencia
 
     const turnosMes = await Turno.find({
         estado: 'Cobrado',
@@ -194,6 +197,7 @@ export const getMetricasMes = asyncHandler(async (req, res) => {
         totalTransferencia,
         totalVentas,
         total: totalEfectivo + totalTransferencia,
+        egresos: { ...egresos, total: totalEgresos },
         turnos,
         cantidadPedidos,
         cantidadCajas: cajasMes.length
