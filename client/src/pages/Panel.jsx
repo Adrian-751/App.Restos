@@ -63,7 +63,7 @@ const Panel = () => {
             const pedidosCobradosHoy = pedidosArray.filter((p) => {
                 if (!p || !p.createdAt) return false
                 const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
-                return fechaPedido === hoy && p.estado === 'Cobrado'
+                return fechaPedido === hoy && String(p.estado || '').toLowerCase() === 'cobrado'
             })
 
             const turnosDesdePedidos = pedidosCobradosHoy.reduce(

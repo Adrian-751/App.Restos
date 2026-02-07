@@ -29,7 +29,7 @@ export const getMetricasSemana = asyncHandler(async (req, res) => {
 
     // Filtrar pedidos cobrados de esta semana
     const pedidosSemana = await Pedido.find({
-        estado: 'Cobrado',
+        estado: { $regex: /^cobrado$/i },
         createdAt: {
             $gte: inicioSemana,
             $lte: finSemana
@@ -128,7 +128,7 @@ export const getMetricasMes = asyncHandler(async (req, res) => {
 
     // Filtrar pedidos cobrados de este mes
     const pedidosMes = await Pedido.find({
-        estado: 'Cobrado',
+        estado: { $regex: /^cobrado$/i },
         createdAt: {
             $gte: inicioMes,
             $lte: finMes

@@ -13,6 +13,7 @@ const Pedidos = () => {
     const [showModal, setShowModal] = useState(false)
     const [editingPedido, setEditingPedido] = useState(null)
     const [formData, setFormData] = useState({
+        nombre: '',
         mesaId: '',
         clienteId: '',
         items: [],
@@ -91,12 +92,14 @@ const Pedidos = () => {
             const clienteId =
                 typeof pedido.clienteId === 'object' && pedido.clienteId !== null ? pedido.clienteId._id : (pedido.clienteId || '')
             setFormData({
+                nombre: pedido.nombre || '',
                 mesaId,
                 clienteId,
                 items: pedido.items || [],
             })
         } else {
             setFormData({
+                nombre: '',
                 mesaId: '',
                 clienteId: '',
                 items: [],
@@ -135,6 +138,7 @@ const Pedidos = () => {
 
             setEditingPedido(existente)
             setFormData({
+                nombre: existente.nombre || '',
                 mesaId: mesaId || (typeof existente.mesaId === 'object' && existente.mesaId !== null ? existente.mesaId._id : (existente.mesaId || '')),
                 clienteId: clienteId || (typeof existente.clienteId === 'object' && existente.clienteId !== null ? existente.clienteId._id : (existente.clienteId || '')),
                 items: Array.isArray(existente.items) ? existente.items : [],
@@ -220,6 +224,7 @@ const Pedidos = () => {
 
             const payload = {
                 ...data,
+                nombre: (data.nombre || '').toString(),
                 mesaId: data.mesaId ? data.mesaId : null,
                 clienteId: data.clienteId ? data.clienteId : null,
                 ...(data.clienteId ? { estado: 'Cuenta Corriente' } : {}),
@@ -255,6 +260,7 @@ const Pedidos = () => {
                             0
                         )
                         await api.put(`/pedidos/${existente._id}`, {
+                            nombre: payload.nombre?.trim() ? payload.nombre : (existente.nombre || ''),
                             mesaId: payload.mesaId || null,
                             clienteId: payload.clienteId || null,
                             items: mergedItems,
@@ -393,7 +399,7 @@ const Pedidos = () => {
                                                 ? `Mesa ${mesa.numero}${mesa.nombre ? ` - ${capitalizeFirst(mesa.nombre)}` : ''}`
                                                 : 'Mesa N/A'
                                         })()
-                                        : 'Sin Mesa'}
+                                        : (pedido.nombre ? pedido.nombre : 'Sin Mesa')}
                                 </h3>
                                 {pedido.clienteId && (
                                     <p className="text-sm text-slate-300">
@@ -495,6 +501,18 @@ const Pedidos = () => {
                             {editingPedido ? 'Editar Pedido' : 'Nuevo Pedido'}
                         </h3>
                         <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">
+                                    Nombre del pedido (opcional)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.nombre || ''}
+                                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                                    className="input-field"
+                                    placeholder="Ej: Pedido kiosco, Pedido Juan..."
+                                />
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-2">
                                     Mesa (opcional)

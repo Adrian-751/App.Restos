@@ -21,7 +21,7 @@ export const getPedidos = asyncHandler(async (req, res) => {
  */
 export const createPedido = asyncHandler(async (req, res) => {
     const { Pedido, Cliente } = req.models
-    const { mesaId, clienteId, items, total, observaciones } = req.body;
+    const { nombre, mesaId, clienteId, items, total, observaciones } = req.body;
 
     // Determinar estado inicial
     let estado = 'Pendiente';
@@ -37,6 +37,7 @@ export const createPedido = asyncHandler(async (req, res) => {
     }
 
     const pedido = await Pedido.create({
+        nombre: (nombre ?? '').toString(),
         mesaId: mesaId || null,
         clienteId: clienteId || null,
         items: items || [],

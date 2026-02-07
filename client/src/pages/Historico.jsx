@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
 import api from '../utils/api'
 import { toastError, toastSuccess } from '../utils/toast'
+import Modal from '../components/Modal'
+import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
+import { useModalHotkeys } from '../hooks/useModalHotkeys'
 
 const Historico = () => {
     const [historico, setHistorico] = useState([])
     const [loading, setLoading] = useState(true)
+    const [showEditModal, setShowEditModal] = useState(false)
+    const [itemEditando, setItemEditando] = useState(null)
+    const [observacionesEdit, setObservacionesEdit] = useState('')
+
+    useLockBodyScroll(!!showEditModal)
 
     const fetchHistorico = async () => {
         try {
@@ -46,6 +54,35 @@ const Historico = () => {
         }
     }
 
+    const openEdit = (item) => {
+        setItemEditando(item)
+        setObservacionesEdit(item?.observaciones || '')
+        setShowEditModal(true)
+    }
+
+    const saveEdit = async () => {
+        if (!itemEditando?._id) return
+        try {
+            await api.put(`/pedidos/${itemEditando._id}`, {
+                observaciones: observacionesEdit || '',
+            })
+            setShowEditModal(false)
+            setItemEditando(null)
+            setObservacionesEdit('')
+            fetchHistorico()
+            toastSuccess('Pedido actualizado')
+        } catch (error) {
+            const msg = error.response?.data?.error || error.message || 'Error al actualizar el pedido'
+            toastError(msg)
+        }
+    }
+
+    useModalHotkeys({
+        isOpen: showEditModal,
+        onCancel: () => { setShowEditModal(false); setItemEditando(null) },
+        onConfirm: saveEdit,
+    })
+
     const formatFecha = (fecha) => {
         return new Date(fecha).toLocaleString('es-AR', {
             day: '2-digit',
@@ -68,8 +105,11 @@ const Historico = () => {
             return `Mesa ${item.mesaNumero}`
         } else if (item.clienteNombre) {
             return `Cliente: ${item.clienteNombre}`
+        } else if (item.nombre) {
+            return item.nombre
         } else {
-            return `Pedido #${item._id.slice(-6)}`
+            const id = item?._id || item?.id || ''
+            return id ? `Pedido #${String(id).slice(-6)}` : 'Pedido'
         }
     }
 
@@ -207,6 +247,14 @@ const Historico = () => {
 
                             {/* Botón Eliminar */}
                             <div className="mt-4">
+                                {item.tipo === 'pedido' && (
+                                    <button
+                                        onClick={() => openEdit(item)}
+                                        className="w-full bg-white/10 hover:bg-white/15 text-white px-4 py-2 rounded-lg text-sm transition-colors mb-2"
+                                    >
+                                        Editar observaciones
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => deletePedido(item._id)}
                                     className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
@@ -218,6 +266,40 @@ const Historico = () => {
                     ))}
                 </div>
             )}
+
+            <Modal
+                isOpen={showEditModal}
+                onClose={() => { setShowEditModal(false); setItemEditando(null) }}
+                title={`Editar pedido: ${itemEditando ? getNombreItem(itemEditando) : ''}`}
+                maxWidth="max-w-lg"
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Observaciones
+                        </label>
+                        <textarea
+                            value={observacionesEdit}
+                            onChange={(e) => setObservacionesEdit(e.target.value)}
+                            className="input-field"
+                            rows="4"
+                            placeholder="Ej: Transferencia a nombre de..., comprobante..., etc."
+                        />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <button onClick={saveEdit} className="btn-primary w-full sm:flex-1">
+                            Guardar
+                        </button>
+                        <button
+                            onClick={() => { setShowEditModal(false); setItemEditando(null) }}
+                            className="btn-secondary w-full sm:flex-1"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     )
 }

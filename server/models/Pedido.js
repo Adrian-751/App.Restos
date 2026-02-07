@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const pedidoSchema = new mongoose.Schema({
+    nombre: {
+        type: String,
+        default: '',
+        trim: true
+    },
     mesaId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Mesa',
