@@ -41,6 +41,7 @@ const Clientes = () => {
     const [selectedProducto, setSelectedProducto] = useState(null)
     const [cantidad, setCantidad] = useState(1)
     const [precioPersonalizado, setPrecioPersonalizado] = useState('')
+    const [productoFiltro, setProductoFiltro] = useState('')
 
     // Estados para editar pedidos del cliente
     const [showEditPedidosClienteModal, setShowEditPedidosClienteModal] = useState(false)
@@ -51,6 +52,7 @@ const Clientes = () => {
     const [selectedProductoEdit, setSelectedProductoEdit] = useState(null)
     const [cantidadEdit, setCantidadEdit] = useState(1)
     const [precioPersonalizadoEdit, setPrecioPersonalizadoEdit] = useState('')
+    const [productoFiltroEdit, setProductoFiltroEdit] = useState('')
 
     useLockBodyScroll(
         !!showModal ||
@@ -88,7 +90,11 @@ const Clientes = () => {
         try {
             const res = await api.get('/pedidos')
             // Filtrar solo pedidos del cliente que no estén cobrados
-            const pedidosDelCliente = res.data.filter(p => p.clienteId === clienteId && p.estado?.toLowerCase() !== 'cobrado')
+            const pedidosDelCliente = res.data.filter(p => {
+                const cid =
+                    typeof p.clienteId === 'object' && p.clienteId !== null ? p.clienteId._id : p.clienteId
+                return String(cid) === String(clienteId) && p.estado?.toLowerCase() !== 'cobrado'
+            })
             setPedidosCliente(pedidosDelCliente)
         } catch (error) {
             console.error('Error fetching pedidos:', error)
@@ -305,6 +311,7 @@ const Clientes = () => {
         setSelectedProducto(null)
         setCantidad(1)
         setPrecioPersonalizado('')
+        setProductoFiltro('')
         setShowNuevoPedidoModal(true)
     }
 
@@ -334,6 +341,14 @@ const Clientes = () => {
         setPrecioPersonalizado('')
     }
 
+    const productosFiltrados = Array.isArray(productos)
+        ? productos.filter((p) => {
+            if (!p) return false
+            if (!productoFiltro.trim()) return true
+            return String(p.nombre || '').toLowerCase().includes(productoFiltro.trim().toLowerCase())
+        })
+        : []
+
     const removeItemFromPedido = (index) => {
         setPedidoFormData({
             ...pedidoFormData,
@@ -361,7 +376,11 @@ const Clientes = () => {
         try {
             const res = await api.get('/pedidos')
             const pedidosDelCliente = res.data.filter(
-                p => p.clienteId === cliente._id && p.estado?.toLowerCase() !== 'cobrado'
+                p => {
+                    const cid =
+                        typeof p.clienteId === 'object' && p.clienteId !== null ? p.clienteId._id : p.clienteId
+                    return String(cid) === String(cliente._id) && p.estado?.toLowerCase() !== 'cobrado'
+                }
             )
 
             // Verificar si hay pedidos pendientes
@@ -389,6 +408,7 @@ const Clientes = () => {
             setSelectedProductoEdit(null)
             setCantidadEdit(1)
             setPrecioPersonalizadoEdit('')
+            setProductoFiltroEdit('')
             setShowEditPedidosClienteModal(true)
         } catch (error) {
             console.error('Error fetching pedidos:', error)
@@ -422,6 +442,14 @@ const Clientes = () => {
         setPrecioPersonalizadoEdit('')
     }
 
+    const productosFiltradosEdit = Array.isArray(productos)
+        ? productos.filter((p) => {
+            if (!p) return false
+            if (!productoFiltroEdit.trim()) return true
+            return String(p.nombre || '').toLowerCase().includes(productoFiltroEdit.trim().toLowerCase())
+        })
+        : []
+
     const removeItemFromEditPedidos = (index) => {
         setEditPedidosFormData({
             ...editPedidosFormData,
@@ -451,7 +479,11 @@ const Clientes = () => {
             // Obtener todos los pedidos no cobrados del cliente
             const res = await api.get('/pedidos')
             const pedidosDelCliente = res.data.filter(
-                p => p.clienteId === clienteEditandoPedidos._id && p.estado?.toLowerCase() !== 'cobrado'
+                p => {
+                    const cid =
+                        typeof p.clienteId === 'object' && p.clienteId !== null ? p.clienteId._id : p.clienteId
+                    return String(cid) === String(clienteEditandoPedidos._id) && p.estado?.toLowerCase() !== 'cobrado'
+                }
             )
 
             const totalAnterior = pedidosDelCliente.reduce((sum, p) => sum + (p.total || 0), 0)
@@ -579,7 +611,7 @@ const Clientes = () => {
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h3 className="text-lg font-bold text-white">#{cliente.numero}</h3>
-                                <p className="text-xl text-fuxia-light">{cliente.nombre}</p>
+                                <p className="text-xl text-white">{cliente.nombre}</p>
                             </div>
                             <span
                                 className={`px-3 py-1 rounded text-sm font-semibold ${cliente.cuentaCorriente > 0
@@ -855,13 +887,27 @@ const Clientes = () => {
                             <div className="border border-slate-700 rounded-lg p-4">
                                 <h4 className="text-white font-semibold mb-3">Agregar Producto</h4>
                                 <div className="flex flex-col sm:flex-row sm:items-end gap-2 mb-2">
+                                    <input
+                                        type="text"
+                                        value={productoFiltro}
+                                        onChange={(e) => setProductoFiltro(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key !== 'Enter') return
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            const first = productosFiltrados?.[0]
+                                            if (first?._id) setSelectedProducto(first._id)
+                                        }}
+                                        placeholder="Buscar producto..."
+                                        className="input-field w-full sm:w-56"
+                                    />
                                     <select
                                         value={selectedProducto || ''}
                                         onChange={(e) => setSelectedProducto(e.target.value)}
                                         className="input-field w-full sm:flex-1"
                                     >
                                         <option value="">Seleccionar producto</option>
-                                        {productos.map((prod) => (
+                                        {productosFiltrados.map((prod) => (
                                             <option key={prod._id} value={prod._id}>
                                                 {prod.nombre} - ${prod.precio.toLocaleString()}
                                             </option>
@@ -997,13 +1043,27 @@ const Clientes = () => {
                             <div className="border border-slate-700 rounded-lg p-4">
                                 <h4 className="text-white font-semibold mb-3">Agregar Producto</h4>
                                 <div className="flex flex-col sm:flex-row sm:items-end gap-2 mb-2">
+                                    <input
+                                        type="text"
+                                        value={productoFiltroEdit}
+                                        onChange={(e) => setProductoFiltroEdit(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key !== 'Enter') return
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            const first = productosFiltradosEdit?.[0]
+                                            if (first?._id) setSelectedProductoEdit(first._id)
+                                        }}
+                                        placeholder="Buscar producto..."
+                                        className="input-field w-full sm:w-56"
+                                    />
                                     <select
                                         value={selectedProductoEdit || ''}
                                         onChange={(e) => setSelectedProductoEdit(e.target.value)}
                                         className="input-field w-full sm:flex-1"
                                     >
                                         <option value="">Seleccionar producto</option>
-                                        {productos.map((prod) => (
+                                        {productosFiltradosEdit.map((prod) => (
                                             <option key={prod._id} value={prod._id}>
                                                 {prod.nombre} - ${prod.precio.toLocaleString()}
                                             </option>

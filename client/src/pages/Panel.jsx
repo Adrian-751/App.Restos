@@ -25,6 +25,18 @@ const Panel = () => {
                 ? (cajaHoy.totalDia || (cajaHoy.totalEfectivo || 0) + (cajaHoy.totalTransferencia || 0))
                 : 0;
 
+            // Egresos del día (si existen)
+            const egresosArray = Array.isArray(cajaHoy?.egresos) ? cajaHoy.egresos : []
+            const egresosHoy = egresosArray.reduce(
+                (acc, e) => {
+                    acc.efectivo += Number(e?.efectivo || 0)
+                    acc.transferencia += Number(e?.transferencia || 0)
+                    return acc
+                },
+                { efectivo: 0, transferencia: 0 }
+            )
+            egresosHoy.total = (egresosHoy.efectivo || 0) + (egresosHoy.transferencia || 0)
+
             // Calcular turnos cobrados del día
             const turnosArray = Array.isArray(turnos.data) ? turnos.data : []
             const turnosHoy = turnosArray.filter((t) => {
@@ -83,6 +95,7 @@ const Panel = () => {
                 totalHoy: totalDia,
                 montoCajaCerrada: montoCajaCerrada,
                 turnosHoy: { cantidad: cantidadTurnos, total: totalTurnos },
+                egresosHoy,
             })
             setLoading(false)
         } catch (error) {
@@ -96,6 +109,7 @@ const Panel = () => {
                 totalHoy: 0,
                 montoCajaCerrada: null,
                 turnosHoy: { cantidad: 0, total: 0 },
+                egresosHoy: { efectivo: 0, transferencia: 0, total: 0 },
             })
             setLoading(false)
         }
@@ -147,7 +161,7 @@ const Panel = () => {
         <div className="space-y-6">
             <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 sm:mb-6">Panel de Administración</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                 <div className="card bg-gradient-to-br from-orange-600 to-orange-800">
                     <div className="flex items-center justify-between">
                         <div>
@@ -192,6 +206,23 @@ const Panel = () => {
                             <p className="text-2xl font-bold text-white mt-1">{stats.pedidosPendientes}</p>
                         </div>
                         <span className="text-4xl">📝</span>
+                    </div>
+                </div>
+
+                <div className="card bg-gradient-to-br from-slate-700 to-slate-900">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-slate-200 text-sm">Egresos Hoy</p>
+                            <p className="text-2xl font-bold text-white mt-1">
+                                ${Number(stats.egresosHoy?.total || 0).toLocaleString()}
+                            </p>
+                            {(Number(stats.egresosHoy?.total || 0) > 0) && (
+                                <p className="text-xs font-semibold text-slate-200 mt-1">
+                                    Ef: ${Number(stats.egresosHoy?.efectivo || 0).toLocaleString()} / Tr: ${Number(stats.egresosHoy?.transferencia || 0).toLocaleString()}
+                                </p>
+                            )}
+                        </div>
+                        <span className="text-4xl">↘️</span>
                     </div>
                 </div>
 

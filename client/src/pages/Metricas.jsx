@@ -74,7 +74,7 @@ const Metricas = () => {
                     <p className="text-slate-400 text-sm mb-4">
                         Del {new Date(metricasSemana.inicioSemana).toLocaleDateString()} al {new Date(metricasSemana.finSemana).toLocaleDateString()}
                     </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div className="bg-slate-700 p-4 rounded-lg">
                             <p className="text-slate-300 text-sm">Total Efectivo</p>
                             <p className="text-2xl font-bold text-white">
@@ -86,6 +86,17 @@ const Metricas = () => {
                             <p className="text-2xl font-bold text-white">
                                 ${Number(metricasSemana.totalTransferencia || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </p>
+                        </div>
+                        <div className="bg-slate-700 p-4 rounded-lg">
+                            <p className="text-slate-300 text-sm">Total Turnos</p>
+                            <p className="text-2xl font-bold text-white">
+                                ${Number(metricasSemana.turnos?.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            </p>
+                            {(metricasSemana.turnos?.cantidad || 0) > 0 && (
+                                <p className="text-xs text-slate-300 mt-1">
+                                    x{Number(metricasSemana.turnos?.cantidad || 0).toLocaleString()}
+                                </p>
+                            )}
                         </div>
                         <div className="bg-slate-700 p-4 rounded-lg">
                             <p className="text-slate-300 text-sm">Total General</p>
@@ -112,7 +123,7 @@ const Metricas = () => {
                     <p className="text-slate-400 text-sm mb-4">
                         {formatearMes(metricasMes.inicioMes)}
                     </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div className="bg-slate-700 p-4 rounded-lg">
                             <p className="text-slate-300 text-sm">Total Efectivo</p>
                             <p className="text-2xl font-bold text-white">
@@ -124,6 +135,17 @@ const Metricas = () => {
                             <p className="text-2xl font-bold text-white">
                                 ${Number(metricasMes.totalTransferencia || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </p>
+                        </div>
+                        <div className="bg-slate-700 p-4 rounded-lg">
+                            <p className="text-slate-300 text-sm">Total Turnos</p>
+                            <p className="text-2xl font-bold text-white">
+                                ${Number(metricasMes.turnos?.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            </p>
+                            {(metricasMes.turnos?.cantidad || 0) > 0 && (
+                                <p className="text-xs text-slate-300 mt-1">
+                                    x{Number(metricasMes.turnos?.cantidad || 0).toLocaleString()}
+                                </p>
+                            )}
                         </div>
                         <div className="bg-slate-700 p-4 rounded-lg">
                             <p className="text-slate-300 text-sm">Total General</p>

@@ -35,6 +35,12 @@ const cajaSchema = new mongoose.Schema({
         transferencia: Number,
         fecha: Date
     }],
+    egresos: [{
+        efectivo: { type: Number, default: 0 },
+        transferencia: { type: Number, default: 0 },
+        observaciones: { type: String, default: '' },
+        fecha: { type: Date, default: Date.now }
+    }],
     cerrada: {
         type: Boolean,
         default: false

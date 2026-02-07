@@ -7,8 +7,14 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 export const getHistorico = asyncHandler(async (req, res) => {
     const { Pedido, Turno } = req.models
     try {
+        const daysRaw = req.query?.days
+        const days = Math.min(Math.max(parseInt(daysRaw ?? '45', 10) || 45, 1), 365)
+        const desde = new Date()
+        desde.setHours(0, 0, 0, 0)
+        desde.setDate(desde.getDate() - days)
+
         // Obtener pedidos cobrados con información relacionada
-        const pedidosCobrados = await Pedido.find({ estado: 'Cobrado' })
+        const pedidosCobrados = await Pedido.find({ estado: 'Cobrado', createdAt: { $gte: desde } })
             .populate('mesaId', 'numero nombre')
             .populate('clienteId', 'nombre')
             .sort({ createdAt: -1 });
@@ -41,7 +47,7 @@ export const getHistorico = asyncHandler(async (req, res) => {
 
     // Obtener turnos cobrados (incluyendo los que fueron eliminados de la sección Turnos)
     // porque en Histórico deben aparecer todos los cobrados
-    const turnosCobrados = await Turno.find({ estado: 'Cobrado' })
+    const turnosCobrados = await Turno.find({ estado: 'Cobrado', createdAt: { $gte: desde } })
         .populate({
             path: 'pedidoId',
             populate: [

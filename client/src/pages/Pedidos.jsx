@@ -8,15 +8,18 @@ const Pedidos = () => {
     const [pedidos, setPedidos] = useState([])
     const [productos, setProductos] = useState([])
     const [mesas, setMesas] = useState([])
+    const [clientes, setClientes] = useState([])
     const [showModal, setShowModal] = useState(false)
     const [editingPedido, setEditingPedido] = useState(null)
     const [formData, setFormData] = useState({
         mesaId: '',
+        clienteId: '',
         items: [],
     })
     const [selectedProducto, setSelectedProducto] = useState(null)
     const [cantidad, setCantidad] = useState(1)
     const [precioPersonalizado, setPrecioPersonalizado] = useState('')
+    const [productoFiltro, setProductoFiltro] = useState('')
     const [showCobroModal, setShowCobroModal] = useState(false)
     const [pedidoACobrar, setPedidoACobrar] = useState(null)
     const [cobroData, setCobroData] = useState({
@@ -37,13 +40,17 @@ const Pedidos = () => {
         fetchPedidos()
         fetchProductos()
         fetchMesas()
+        fetchClientes()
     }, [])
 
     const fetchPedidos = async () => {
         try {
             const res = await api.get('/pedidos')
-            // Filtrar pedidos de cuenta corriente (los que tienen clienteId) y pedidos cobrados
-            const pedidosFiltrados = res.data.filter(p => !p.clienteId && p.estado?.toLowerCase() !== 'cobrado')
+            // Mostrar todos los pedidos NO cobrados (incluye cuenta corriente / pagos parciales)
+            const pedidosFiltrados = res.data.filter((p) => {
+                const est = String(p?.estado || '').toLowerCase()
+                return est !== 'cobrado' && est !== 'cancelado'
+            })
             setPedidos(pedidosFiltrados)
         } catch (error) {
             console.error('Error fetching pedidos:', error)
@@ -68,20 +75,83 @@ const Pedidos = () => {
         }
     }
 
+    const fetchClientes = async () => {
+        try {
+            const res = await api.get('/clientes')
+            setClientes(res.data)
+        } catch (error) {
+            console.error('Error fetching clientes:', error)
+        }
+    }
+
     const openEditModal = (pedido = null) => {
+        setProductoFiltro('')
         if (pedido) {
+            const mesaId =
+                typeof pedido.mesaId === 'object' && pedido.mesaId !== null ? pedido.mesaId._id : (pedido.mesaId || '')
+            const clienteId =
+                typeof pedido.clienteId === 'object' && pedido.clienteId !== null ? pedido.clienteId._id : (pedido.clienteId || '')
             setFormData({
-                mesaId: pedido.mesaId || '',
+                mesaId,
+                clienteId,
                 items: pedido.items || [],
             })
         } else {
             setFormData({
                 mesaId: '',
+                clienteId: '',
                 items: [],
             })
         }
         setEditingPedido(pedido)
         setShowModal(true)
+    }
+
+    const productosFiltrados = Array.isArray(productos)
+        ? productos.filter((p) => {
+            if (!p) return false
+            if (!productoFiltro.trim()) return true
+            return String(p.nombre || '').toLowerCase().includes(productoFiltro.trim().toLowerCase())
+        })
+        : []
+
+    const maybeLoadExistingPedido = async ({ mesaId, clienteId }) => {
+        try {
+            if (editingPedido) return
+            if (formData.items?.length) return
+            if (!mesaId && !clienteId) return
+
+            const res = await api.get('/pedidos')
+            const pedidosArray = Array.isArray(res.data) ? res.data : []
+            const candidatos = pedidosArray.filter((p) => {
+                if (!p) return false
+                const est = String(p.estado || '').toLowerCase()
+                if (est === 'cobrado' || est === 'cancelado') return false
+                if (mesaId) {
+                    const mid = typeof p.mesaId === 'object' && p.mesaId !== null ? p.mesaId._id : p.mesaId
+                    if (String(mid) !== String(mesaId)) return false
+                }
+                if (clienteId) {
+                    const cid = typeof p.clienteId === 'object' && p.clienteId !== null ? p.clienteId._id : p.clienteId
+                    if (String(cid) !== String(clienteId)) return false
+                }
+                return true
+            })
+            const existente = candidatos.sort(
+                (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+            )[0]
+            if (!existente?._id) return
+
+            setEditingPedido(existente)
+            setFormData({
+                mesaId: mesaId || (typeof existente.mesaId === 'object' && existente.mesaId !== null ? existente.mesaId._id : (existente.mesaId || '')),
+                clienteId: clienteId || (typeof existente.clienteId === 'object' && existente.clienteId !== null ? existente.clienteId._id : (existente.clienteId || '')),
+                items: Array.isArray(existente.items) ? existente.items : [],
+            })
+            toastInfo('Pedido existente cargado')
+        } catch (error) {
+            console.error('Error cargando pedido existente:', error)
+        }
     }
 
     const addItem = () => {
@@ -157,11 +227,61 @@ const Pedidos = () => {
                 }
             }
 
-            if (editingPedido) {
-                await api.put(`/pedidos/${editingPedido._id}`, data)
-            } else {
-                await api.post('/pedidos', data)
+            const payload = {
+                ...data,
+                ...(data.clienteId ? { estado: 'Cuenta Corriente' } : {}),
             }
+
+            // Si ya existe un pedido pendiente para esa mesa/cliente, agrandar el mismo (no crear otro)
+            if (!editingPedido && (payload.mesaId || payload.clienteId)) {
+                try {
+                    const res = await api.get('/pedidos')
+                    const pedidosArray = Array.isArray(res.data) ? res.data : []
+                    const candidatos = pedidosArray.filter((p) => {
+                        if (!p) return false
+                        const est = String(p.estado || '').toLowerCase()
+                        if (est === 'cobrado' || est === 'cancelado') return false
+                        if (payload.mesaId) {
+                            const mid = typeof p.mesaId === 'object' && p.mesaId !== null ? p.mesaId._id : p.mesaId
+                            if (String(mid) !== String(payload.mesaId)) return false
+                        }
+                        if (payload.clienteId) {
+                            const cid = typeof p.clienteId === 'object' && p.clienteId !== null ? p.clienteId._id : p.clienteId
+                            if (String(cid) !== String(payload.clienteId)) return false
+                        }
+                        return true
+                    })
+                    const existente = candidatos.sort(
+                        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+                    )[0]
+                    if (existente?._id) {
+                        const existingItems = Array.isArray(existente.items) ? existente.items : []
+                        const mergedItems = [...existingItems, ...(payload.items || [])]
+                        const mergedTotal = mergedItems.reduce(
+                            (sum, it) => sum + (Number(it?.precio || 0) * Number(it?.cantidad || 0)),
+                            0
+                        )
+                        await api.put(`/pedidos/${existente._id}`, {
+                            mesaId: payload.mesaId || null,
+                            clienteId: payload.clienteId || null,
+                            items: mergedItems,
+                            total: mergedTotal,
+                            ...(payload.clienteId ? { estado: 'Cuenta Corriente' } : {}),
+                        })
+                        setShowModal(false)
+                        setEditingPedido(null)
+                        fetchPedidos()
+                        return
+                    }
+                } catch (e) {
+                    // si falla la búsqueda, seguimos con create normal
+                    console.error('Error buscando pedido existente:', e)
+                }
+            }
+
+            if (editingPedido) await api.put(`/pedidos/${editingPedido._id}`, payload)
+            else await api.post('/pedidos', payload)
+
             setShowModal(false)
             setEditingPedido(null)
             fetchPedidos()
@@ -282,6 +402,14 @@ const Pedidos = () => {
                                         })()
                                         : 'Sin Mesa'}
                                 </h3>
+                                {pedido.clienteId && (
+                                    <p className="text-sm text-slate-300">
+                                        Cliente:{' '}
+                                        {typeof pedido.clienteId === 'object' && pedido.clienteId !== null
+                                            ? (pedido.clienteId.nombre || 'N/A')
+                                            : (clientes.find((c) => String(c._id) === String(pedido.clienteId))?.nombre || 'N/A')}
+                                    </p>
+                                )}
                                 <p className="text-sm text-slate-400">
                                     {new Date(pedido.createdAt).toLocaleString()}
                                 </p>
@@ -380,7 +508,11 @@ const Pedidos = () => {
                                 </label>
                                 <select
                                     value={formData.mesaId}
-                                    onChange={(e) => setFormData({ ...formData, mesaId: e.target.value })}
+                                    onChange={(e) => {
+                                        const mesaId = e.target.value
+                                        setFormData({ ...formData, mesaId })
+                                        void maybeLoadExistingPedido({ mesaId, clienteId: formData.clienteId })
+                                    }}
                                     className="input-field"
                                 >
                                     <option value="">Sin Mesa</option>
@@ -392,16 +524,52 @@ const Pedidos = () => {
                                 </select>
                             </div>
 
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">
+                                    Cliente (opcional)
+                                </label>
+                                <select
+                                    value={formData.clienteId || ''}
+                                    onChange={(e) => {
+                                        const clienteId = e.target.value
+                                        setFormData({ ...formData, clienteId })
+                                        void maybeLoadExistingPedido({ mesaId: formData.mesaId, clienteId })
+                                    }}
+                                    className="input-field"
+                                >
+                                    <option value="">Sin Cliente</option>
+                                    {clientes.map((c) => (
+                                        <option key={c._id} value={c._id}>
+                                            #{c.numero} - {c.nombre}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <div className="border border-slate-700 rounded-lg p-4">
                                 <h4 className="text-white font-semibold mb-3">Agregar Producto</h4>
                                 <div className="flex flex-col sm:flex-row sm:items-end gap-2 mb-2">
+                                    <input
+                                        type="text"
+                                        value={productoFiltro}
+                                        onChange={(e) => setProductoFiltro(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key !== 'Enter') return
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            const first = productosFiltrados?.[0]
+                                            if (first?._id) setSelectedProducto(first._id)
+                                        }}
+                                        placeholder="Buscar producto..."
+                                        className="input-field w-full sm:w-56"
+                                    />
                                     <select
                                         value={selectedProducto || ''}
                                         onChange={(e) => setSelectedProducto(e.target.value)}
                                         className="input-field w-full sm:flex-1"
                                     >
                                         <option value="">Seleccionar producto</option>
-                                        {productos.map((prod) => (
+                                        {productosFiltrados.map((prod) => (
                                             <option key={prod._id} value={prod._id}>
                                                 {prod.nombre} - ${prod.precio.toLocaleString()}
                                             </option>

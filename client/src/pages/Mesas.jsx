@@ -7,6 +7,7 @@ import { useModalHotkeys } from '../hooks/useModalHotkeys'
 const Mesas = () => {
     const [mesas, setMesas] = useState([])
     const [productos, setProductos] = useState([])
+    const [clientes, setClientes] = useState([])
     const [showModal, setShowModal] = useState(false)
     const [editingMesa, setEditingMesa] = useState(null)
     const [formData, setFormData] = useState({ numero: '', nombre: '', color: '#e11d48' })
@@ -14,6 +15,7 @@ const Mesas = () => {
     useEffect(() => {
         fetchMesas()
         fetchProductos()
+        fetchClientes()
     }, [])
 
     const fetchMesas = async () => {
@@ -34,16 +36,27 @@ const Mesas = () => {
         }
     }
 
+    const fetchClientes = async () => {
+        try {
+            const res = await api.get('/clientes')
+            setClientes(res.data)
+        } catch (error) {
+            console.error('Error fetching clientes:', error)
+        }
+    }
+
     // Estados para el modal de nuevo pedido
     const [showPedidoModal, setShowPedidoModal] = useState(false)
     const [pedidoFormData, setPedidoFormData] = useState({
         mesaId: '',
+        clienteId: '',
         items: [],
     })
     const [editingPedidoId, setEditingPedidoId] = useState(null)
     const [selectedProducto, setSelectedProducto] = useState(null)
     const [cantidad, setCantidad] = useState(1)
     const [precioPersonalizado, setPrecioPersonalizado] = useState('')
+    const [productoFiltro, setProductoFiltro] = useState('')
 
     // Drag táctil / pointer (móvil + desktop)
     const mapRef = useRef(null)
@@ -283,8 +296,9 @@ const Mesas = () => {
 
     // Funciones para el modal de nuevo pedido
     const openPedidoModal = async (mesaId = '') => {
+        setProductoFiltro('')
         setEditingPedidoId(null)
-        setPedidoFormData({ mesaId, items: [] })
+        setPedidoFormData({ mesaId, clienteId: '', items: [] })
         setSelectedProducto(null)
         setCantidad(1)
         setPrecioPersonalizado('')
@@ -306,9 +320,14 @@ const Mesas = () => {
                     (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
                 )[0]
                 if (existente?._id) {
+                    const clienteId =
+                        typeof existente.clienteId === 'object' && existente.clienteId !== null
+                            ? existente.clienteId._id
+                            : (existente.clienteId || '')
                     setEditingPedidoId(existente._id)
                     setPedidoFormData({
                         mesaId,
+                        clienteId,
                         items: Array.isArray(existente.items) ? existente.items : [],
                     })
                     toastInfo('Pedido existente cargado')
@@ -352,6 +371,14 @@ const Mesas = () => {
             toastError('Error al agregar el producto')
         }
     }
+
+    const productosFiltrados = Array.isArray(productos)
+        ? productos.filter((p) => {
+            if (!p) return false
+            if (!productoFiltro.trim()) return true
+            return String(p.nombre || '').toLowerCase().includes(productoFiltro.trim().toLowerCase())
+        })
+        : []
 
     const removeItem = (index) => {
         setPedidoFormData({
@@ -401,13 +428,18 @@ const Mesas = () => {
                 }
             }
 
+            const payload = {
+                ...data,
+                ...(data.clienteId ? { estado: 'Cuenta Corriente' } : {}),
+            }
+
             if (editingPedidoId) {
-                await api.put(`/pedidos/${editingPedidoId}`, data)
+                await api.put(`/pedidos/${editingPedidoId}`, payload)
             } else {
-                await api.post('/pedidos', data)
+                await api.post('/pedidos', payload)
             }
             setShowPedidoModal(false)
-            setPedidoFormData({ mesaId: '', items: [] })
+            setPedidoFormData({ mesaId: '', clienteId: '', items: [] })
             setEditingPedidoId(null)
             toastSuccess('Pedido guardado')
         } catch (error) {
@@ -583,16 +615,50 @@ const Mesas = () => {
                                 </select>
                             </div>
 
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">
+                                    Cliente (opcional)
+                                </label>
+                                <select
+                                    value={pedidoFormData.clienteId || ''}
+                                    onChange={(e) =>
+                                        setPedidoFormData({ ...pedidoFormData, clienteId: e.target.value })
+                                    }
+                                    className="input-field"
+                                >
+                                    <option value="">Sin Cliente</option>
+                                    {clientes.map((c) => (
+                                        <option key={c._id} value={c._id}>
+                                            #{c.numero} - {c.nombre}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <div className="border border-slate-700 rounded-lg p-4">
                                 <h4 className="text-white font-semibold mb-3">Agregar Producto</h4>
                                 <div className="flex flex-col sm:flex-row sm:items-end gap-2 mb-2">
+                                    <input
+                                        type="text"
+                                        value={productoFiltro}
+                                        onChange={(e) => setProductoFiltro(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key !== 'Enter') return
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            const first = productosFiltrados?.[0]
+                                            if (first?._id) setSelectedProducto(first._id)
+                                        }}
+                                        placeholder="Buscar producto..."
+                                        className="input-field w-full sm:w-56"
+                                    />
                                     <select
                                         value={selectedProducto || ''}
                                         onChange={(e) => setSelectedProducto(e.target.value)}
                                         className="input-field w-full sm:flex-1"
                                     >
                                         <option value="">Seleccionar producto</option>
-                                        {productos.map((prod) => (
+                                        {productosFiltrados.map((prod) => (
                                             <option key={prod._id} value={prod._id}>
                                                 {prod.nombre} - ${prod.precio.toLocaleString()}
                                             </option>

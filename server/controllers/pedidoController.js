@@ -64,6 +64,56 @@ export const updatePedido = asyncHandler(async (req, res) => {
     const estadoAnterior = pedido.estado;
     const estadoNuevo = req.body.estado;
 
+    // Si es cuenta corriente (o se asigna/quita cliente), mantener la cuenta corriente sincronizada
+    // con el saldo pendiente (total - pagos). Solo aplica mientras NO esté cobrado.
+    if (estadoAnterior?.toLowerCase() !== 'cobrado') {
+        const oldTotal = parseFloat(pedido.total) || 0
+        const oldE = parseFloat(pedido.efectivo) || 0
+        const oldT = parseFloat(pedido.transferencia) || 0
+        const oldPaid = oldE + oldT
+        const oldOutstanding = oldTotal - oldPaid
+
+        const newTotal = req.body.total != null ? (parseFloat(req.body.total) || 0) : oldTotal
+        const newE = req.body.efectivo != null ? (parseFloat(req.body.efectivo) || 0) : oldE
+        const newT = req.body.transferencia != null ? (parseFloat(req.body.transferencia) || 0) : oldT
+        const newPaid = newE + newT
+        const newOutstanding = newTotal - newPaid
+
+        const oldClienteId = pedido.clienteId ? pedido.clienteId.toString() : null
+        const newClienteId = req.body.clienteId != null
+            ? (req.body.clienteId ? req.body.clienteId.toString() : null)
+            : oldClienteId
+
+        const adjustCliente = async (clienteId, delta) => {
+            if (!clienteId || !delta) return
+            const cliente = await Cliente.findById(clienteId)
+            if (!cliente) return
+            cliente.cuentaCorriente = (cliente.cuentaCorriente || 0) + delta
+            await cliente.save()
+        }
+
+        if (!oldClienteId && newClienteId) {
+            // Se asignó un cliente: sumar el saldo pendiente actual
+            await adjustCliente(newClienteId, newOutstanding)
+            // Forzar estado cuenta corriente si corresponde
+            if (!req.body.estado) req.body.estado = 'Cuenta Corriente'
+        } else if (oldClienteId && !newClienteId) {
+            // Se quitó el cliente: restar el saldo pendiente anterior
+            await adjustCliente(oldClienteId, -oldOutstanding)
+        } else if (oldClienteId && newClienteId && oldClienteId !== newClienteId) {
+            // Se cambió de cliente: mover el saldo
+            await adjustCliente(oldClienteId, -oldOutstanding)
+            await adjustCliente(newClienteId, newOutstanding)
+            if (!req.body.estado) req.body.estado = 'Cuenta Corriente'
+        } else if (oldClienteId && newClienteId && oldClienteId === newClienteId) {
+            // Mismo cliente: ajustar por cambios de total y/o pagos
+            const deltaTotal = newTotal - oldTotal
+            const deltaPaid = newPaid - oldPaid
+            // Cuenta corriente aumenta con deltaTotal, y disminuye con lo pagado
+            await adjustCliente(oldClienteId, deltaTotal - deltaPaid)
+        }
+    }
+
     // Si cambió a "Cobrado"
     if (estadoNuevo?.toLowerCase() === 'cobrado' &&
         estadoAnterior?.toLowerCase() !== 'cobrado') {
@@ -89,15 +139,6 @@ export const updatePedido = asyncHandler(async (req, res) => {
             });
 
             await caja.save();
-        }
-
-        // Si es cuenta corriente, restar de la cuenta del cliente
-        if (pedido.clienteId) {
-            const cliente = await Cliente.findById(pedido.clienteId);
-            if (cliente) {
-                cliente.cuentaCorriente = (cliente.cuentaCorriente || 0) - (pedido.total || 0);
-                await cliente.save();
-            }
         }
     }
 

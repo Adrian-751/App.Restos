@@ -8,7 +8,7 @@ const Historico = () => {
 
     const fetchHistorico = async () => {
         try {
-            const res = await api.get('/historico')
+            const res = await api.get('/historico?days=45')
             setHistorico(res.data)
             setLoading(false)
         } catch (error) {

@@ -1,10 +1,19 @@
 import { useState, useEffect } from 'react'
 import api from '../utils/api'
 import { toastError, toastInfo, toastSuccess } from '../utils/toast'
+import Modal from '../components/Modal'
+import { useModalHotkeys } from '../hooks/useModalHotkeys'
 
 const Caja = () => {
     const [montoInicial, setMontoInicial] = useState('')
     const [caja, setCaja] = useState(null)
+    const [showCerrarConfirm, setShowCerrarConfirm] = useState(false)
+    const [showEgresoModal, setShowEgresoModal] = useState(false)
+    const [egresoData, setEgresoData] = useState({
+        efectivo: '',
+        transferencia: '',
+        observaciones: '',
+    })
 
     // Calcular resumen desde caja
     const resumen = caja ? {
@@ -75,7 +84,6 @@ const Caja = () => {
     }
 
     const cerrarCaja = async () => {
-        if (!window.confirm('¿Está seguro de cerrar la caja?')) return
         try {
             await api.post('/caja/cerrar', { id: caja._id })
             fetchCaja()
@@ -85,6 +93,44 @@ const Caja = () => {
             toastError(errorMsg)
         }
     }
+
+    const handleCerrarCajaClick = () => {
+        setShowCerrarConfirm(true)
+    }
+
+    const handleConfirmCerrar = async () => {
+        setShowCerrarConfirm(false)
+        await cerrarCaja()
+    }
+
+    const registrarEgreso = async () => {
+        try {
+            const efectivo = parseFloat(egresoData.efectivo) || 0
+            const transferencia = parseFloat(egresoData.transferencia) || 0
+            const observaciones = egresoData.observaciones || ''
+            await api.post('/caja/egreso', { efectivo, transferencia, observaciones })
+            setShowEgresoModal(false)
+            setEgresoData({ efectivo: '', transferencia: '', observaciones: '' })
+            fetchCaja()
+            window.dispatchEvent(new Event('caja-updated'))
+            toastSuccess('Egreso registrado')
+        } catch (error) {
+            const msg = error.response?.data?.error || error.message || 'Error al registrar el egreso'
+            toastError(msg)
+        }
+    }
+
+    useModalHotkeys({
+        isOpen: showCerrarConfirm,
+        onCancel: () => setShowCerrarConfirm(false),
+        onConfirm: handleConfirmCerrar,
+    })
+
+    useModalHotkeys({
+        isOpen: showEgresoModal,
+        onCancel: () => setShowEgresoModal(false),
+        onConfirm: registrarEgreso,
+    })
 
     return (
         <div className="space-y-6">
@@ -116,9 +162,17 @@ const Caja = () => {
                     <div className="card bg-gradient-to-br from-green-600 to-green-800">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                             <h3 className="text-lg sm:text-xl font-bold text-white">Caja Abierta</h3>
-                            <button onClick={cerrarCaja} className="btn-secondary w-full sm:w-auto">
-                                Cerrar Caja
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <button
+                                    onClick={() => setShowEgresoModal(true)}
+                                    className="bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all w-full sm:w-auto"
+                                >
+                                    + Egreso
+                                </button>
+                                <button onClick={handleCerrarCajaClick} className="btn-secondary w-full sm:w-auto">
+                                    Cerrar Caja
+                                </button>
+                            </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
@@ -158,6 +212,95 @@ const Caja = () => {
                     )}
                 </div>
             )}
+
+            <Modal
+                isOpen={showCerrarConfirm}
+                onClose={() => setShowCerrarConfirm(false)}
+                title="¿Seguro que querés cerrar la caja?"
+                maxWidth="max-w-sm"
+            >
+                <div className="space-y-4">
+                    <p className="text-slate-300 text-sm">
+                        Esto cerrará la caja del día. Podés volver a abrirla mañana.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <button onClick={handleConfirmCerrar} className="btn-primary w-full sm:flex-1">
+                            Confirmar
+                        </button>
+                        <button
+                            onClick={() => setShowCerrarConfirm(false)}
+                            className="btn-secondary w-full sm:flex-1"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={showEgresoModal}
+                onClose={() => setShowEgresoModal(false)}
+                title="Registrar egreso"
+                maxWidth="max-w-md"
+            >
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Efectivo
+                            </label>
+                            <input
+                                type="number"
+                                value={egresoData.efectivo}
+                                onChange={(e) => setEgresoData({ ...egresoData, efectivo: e.target.value })}
+                                className="input-field"
+                                placeholder="0"
+                                step="0.01"
+                                min="0"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Transferencia
+                            </label>
+                            <input
+                                type="number"
+                                value={egresoData.transferencia}
+                                onChange={(e) => setEgresoData({ ...egresoData, transferencia: e.target.value })}
+                                className="input-field"
+                                placeholder="0"
+                                step="0.01"
+                                min="0"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Observaciones de egreso
+                        </label>
+                        <textarea
+                            value={egresoData.observaciones}
+                            onChange={(e) => setEgresoData({ ...egresoData, observaciones: e.target.value })}
+                            className="input-field"
+                            rows="3"
+                            placeholder="Ej: Compra de hielo..."
+                        />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <button onClick={registrarEgreso} className="btn-primary w-full sm:flex-1">
+                            Guardar
+                        </button>
+                        <button
+                            onClick={() => setShowEgresoModal(false)}
+                            className="btn-secondary w-full sm:flex-1"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     )
 }

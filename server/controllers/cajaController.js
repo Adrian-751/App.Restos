@@ -1,4 +1,5 @@
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { getTodayYMD } from '../utils/date.js'
 
 
 /* Obtener estado de la caja del día
@@ -6,7 +7,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
  */
 export const getEstado = asyncHandler(async (req, res) => {
     const { Caja } = req.models
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = getTodayYMD();
     const caja = await Caja.findOne({ fecha: hoy, cerrada: false });
 
     res.json(caja || null);
@@ -19,7 +20,7 @@ export const getEstado = asyncHandler(async (req, res) => {
 export const abrirCaja = asyncHandler(async (req, res) => {
     const { Caja } = req.models
     const { montoInicial } = req.body;
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = getTodayYMD();
 
     // Verificar si ya hay una caja abierta hoy
     const cajaExistente = await Caja.findOne({ fecha: hoy, cerrada: false });
@@ -31,6 +32,7 @@ export const abrirCaja = asyncHandler(async (req, res) => {
         fecha: hoy,
         montoInicial: parseFloat(montoInicial) || 0,
         ventas: [],
+        egresos: [],
         totalEfectivo: 0,
         totalTransferencia: 0,
         cerrada: false,
@@ -72,8 +74,39 @@ export const cerrarCaja = asyncHandler(async (req, res) => {
 */
 export const getResumen = asyncHandler(async (req, res) => {
     const { Caja } = req.models
-    const fecha = req.params.fecha || new Date().toISOString().split('T')[0];
+    const fecha = req.params.fecha || getTodayYMD();
     const cajas = await Caja.find({ fecha });
 
     res.json(cajas);
 });
+
+/**
+ * Registrar egreso en caja abierta del día
+ * POST /api/caja/egreso
+ */
+export const registrarEgreso = asyncHandler(async (req, res) => {
+    const { Caja } = req.models
+    const hoy = getTodayYMD()
+    const caja = await Caja.findOne({ fecha: hoy, cerrada: false })
+
+    if (!caja) {
+        return res.status(400).json({ error: 'No hay una caja abierta hoy' })
+    }
+
+    const efectivo = parseFloat(req.body.efectivo) || 0
+    const transferencia = parseFloat(req.body.transferencia) || 0
+    const observaciones = (req.body.observaciones || '').toString()
+
+    if (efectivo < 0 || transferencia < 0) {
+        return res.status(400).json({ error: 'Montos inválidos' })
+    }
+    if (efectivo === 0 && transferencia === 0) {
+        return res.status(400).json({ error: 'Debes ingresar un egreso en efectivo o transferencia' })
+    }
+
+    caja.egresos = Array.isArray(caja.egresos) ? caja.egresos : []
+    caja.egresos.push({ efectivo, transferencia, observaciones, fecha: new Date() })
+    await caja.save()
+
+    res.status(201).json(caja)
+})

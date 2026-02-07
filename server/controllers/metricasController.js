@@ -5,7 +5,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 * GET /api/metricas/semana
 */
 export const getMetricasSemana = asyncHandler(async (req, res) => {
-    const { Caja, Pedido } = req.models
+    const { Caja, Pedido, Turno } = req.models
     // Calcular fecha de inicio de semana (lunes)
     const hoy = new Date();
     const diaSemana = hoy.getDay(); // 0 = domingo, 1 = lunes, etc.
@@ -36,10 +36,59 @@ export const getMetricasSemana = asyncHandler(async (req, res) => {
         }
     });
 
-    const totalEfectivo = cajasSemana.reduce((sum, c) => sum + (c.totalEfectivo || 0), 0);
-    const totalTransferencia = cajasSemana.reduce((sum, c) => sum + (c.totalTransferencia || 0), 0);
+    const totalEfectivoBruto = cajasSemana.reduce((sum, c) => sum + (c.totalEfectivo || 0), 0);
+    const totalTransferenciaBruto = cajasSemana.reduce((sum, c) => sum + (c.totalTransferencia || 0), 0);
     const totalVentas = pedidosSemana.reduce((sum, p) => sum + (p.total || 0), 0);
     const cantidadPedidos = pedidosSemana.length;
+
+    // Egresos dentro del rango (vienen guardados en Caja)
+    const egresos = cajasSemana.reduce(
+        (acc, c) => {
+            const arr = Array.isArray(c.egresos) ? c.egresos : []
+            for (const e of arr) {
+                acc.efectivo += Number(e?.efectivo || 0)
+                acc.transferencia += Number(e?.transferencia || 0)
+            }
+            return acc
+        },
+        { efectivo: 0, transferencia: 0 }
+    )
+
+    const totalEfectivo = totalEfectivoBruto - egresos.efectivo
+    const totalTransferencia = totalTransferenciaBruto - egresos.transferencia
+
+    // Turnos cobrados (Turno model) + Turno Futbol vendido como item de pedido
+    const turnosSemana = await Turno.find({
+        estado: 'Cobrado',
+        createdAt: { $gte: inicioSemana, $lte: finSemana }
+    })
+
+    const turnosModel = {
+        cantidad: turnosSemana.length,
+        total: turnosSemana.reduce((sum, t) => sum + (Number(t.total) || 0), 0),
+    }
+
+    const TURNO_PRODUCTO_NOMBRE = 'turno futbol'
+    const turnosProducto = pedidosSemana.reduce(
+        (acc, p) => {
+            const items = Array.isArray(p.items) ? p.items : []
+            for (const it of items) {
+                const nombre = String(it?.nombre || '').trim().toLowerCase()
+                if (nombre !== TURNO_PRODUCTO_NOMBRE) continue
+                const cantidad = Number(it?.cantidad || 0)
+                const subtotal = Number(it?.subtotal ?? ((Number(it?.precio || 0) * cantidad) || 0))
+                acc.cantidad += cantidad
+                acc.total += subtotal
+            }
+            return acc
+        },
+        { cantidad: 0, total: 0 }
+    )
+
+    const turnos = {
+        cantidad: turnosModel.cantidad + turnosProducto.cantidad,
+        total: turnosModel.total + turnosProducto.total,
+    }
 
     res.json({
         inicioSemana: inicioSemana.toISOString().split('T')[0],
@@ -48,6 +97,7 @@ export const getMetricasSemana = asyncHandler(async (req, res) => {
         totalTransferencia,
         totalVentas,
         total: totalEfectivo + totalTransferencia,
+        turnos,
         cantidadPedidos,
         cantidadCajas: cajasSemana.length
     });
@@ -58,7 +108,7 @@ export const getMetricasSemana = asyncHandler(async (req, res) => {
  * GET /api/metricas/mes
  */
 export const getMetricasMes = asyncHandler(async (req, res) => {
-    const { Caja, Pedido } = req.models
+    const { Caja, Pedido, Turno } = req.models
     const hoy = new Date();
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     inicioMes.setHours(0, 0, 0, 0);
@@ -83,10 +133,57 @@ export const getMetricasMes = asyncHandler(async (req, res) => {
         }
     });
 
-    const totalEfectivo = cajasMes.reduce((sum, c) => sum + (c.totalEfectivo || 0), 0);
-    const totalTransferencia = cajasMes.reduce((sum, c) => sum + (c.totalTransferencia || 0), 0);
+    const totalEfectivoBruto = cajasMes.reduce((sum, c) => sum + (c.totalEfectivo || 0), 0);
+    const totalTransferenciaBruto = cajasMes.reduce((sum, c) => sum + (c.totalTransferencia || 0), 0);
     const totalVentas = pedidosMes.reduce((sum, p) => sum + (p.total || 0), 0);
     const cantidadPedidos = pedidosMes.length;
+
+    const egresos = cajasMes.reduce(
+        (acc, c) => {
+            const arr = Array.isArray(c.egresos) ? c.egresos : []
+            for (const e of arr) {
+                acc.efectivo += Number(e?.efectivo || 0)
+                acc.transferencia += Number(e?.transferencia || 0)
+            }
+            return acc
+        },
+        { efectivo: 0, transferencia: 0 }
+    )
+
+    const totalEfectivo = totalEfectivoBruto - egresos.efectivo
+    const totalTransferencia = totalTransferenciaBruto - egresos.transferencia
+
+    const turnosMes = await Turno.find({
+        estado: 'Cobrado',
+        createdAt: { $gte: inicioMes, $lte: finMes }
+    })
+
+    const turnosModel = {
+        cantidad: turnosMes.length,
+        total: turnosMes.reduce((sum, t) => sum + (Number(t.total) || 0), 0),
+    }
+
+    const TURNO_PRODUCTO_NOMBRE = 'turno futbol'
+    const turnosProducto = pedidosMes.reduce(
+        (acc, p) => {
+            const items = Array.isArray(p.items) ? p.items : []
+            for (const it of items) {
+                const nombre = String(it?.nombre || '').trim().toLowerCase()
+                if (nombre !== TURNO_PRODUCTO_NOMBRE) continue
+                const cantidad = Number(it?.cantidad || 0)
+                const subtotal = Number(it?.subtotal ?? ((Number(it?.precio || 0) * cantidad) || 0))
+                acc.cantidad += cantidad
+                acc.total += subtotal
+            }
+            return acc
+        },
+        { cantidad: 0, total: 0 }
+    )
+
+    const turnos = {
+        cantidad: turnosModel.cantidad + turnosProducto.cantidad,
+        total: turnosModel.total + turnosProducto.total,
+    }
 
     res.json({
         mes: hoy.getMonth() + 1,
@@ -97,6 +194,7 @@ export const getMetricasMes = asyncHandler(async (req, res) => {
         totalTransferencia,
         totalVentas,
         total: totalEfectivo + totalTransferencia,
+        turnos,
         cantidadPedidos,
         cantidadCajas: cajasMes.length
     });
