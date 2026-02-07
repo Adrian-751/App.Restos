@@ -3,6 +3,7 @@ import api from '../utils/api'
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
 import { toastError, toastInfo, toastSuccess } from '../utils/toast'
 import { useModalHotkeys } from '../hooks/useModalHotkeys'
+import ProductCombobox from '../components/ProductCombobox'
 
 const Pedidos = () => {
     const [pedidos, setPedidos] = useState([])
@@ -19,7 +20,6 @@ const Pedidos = () => {
     const [selectedProducto, setSelectedProducto] = useState(null)
     const [cantidad, setCantidad] = useState(1)
     const [precioPersonalizado, setPrecioPersonalizado] = useState('')
-    const [productoFiltro, setProductoFiltro] = useState('')
     const [showCobroModal, setShowCobroModal] = useState(false)
     const [pedidoACobrar, setPedidoACobrar] = useState(null)
     const [cobroData, setCobroData] = useState({
@@ -85,7 +85,6 @@ const Pedidos = () => {
     }
 
     const openEditModal = (pedido = null) => {
-        setProductoFiltro('')
         if (pedido) {
             const mesaId =
                 typeof pedido.mesaId === 'object' && pedido.mesaId !== null ? pedido.mesaId._id : (pedido.mesaId || '')
@@ -106,14 +105,6 @@ const Pedidos = () => {
         setEditingPedido(pedido)
         setShowModal(true)
     }
-
-    const productosFiltrados = Array.isArray(productos)
-        ? productos.filter((p) => {
-            if (!p) return false
-            if (!productoFiltro.trim()) return true
-            return String(p.nombre || '').toLowerCase().includes(productoFiltro.trim().toLowerCase())
-        })
-        : []
 
     const maybeLoadExistingPedido = async ({ mesaId, clienteId }) => {
         try {
@@ -549,36 +540,17 @@ const Pedidos = () => {
                             <div className="border border-slate-700 rounded-lg p-4">
                                 <h4 className="text-white font-semibold mb-3">Agregar Producto</h4>
                                 <div className="flex flex-col sm:flex-row sm:items-end gap-2 mb-2">
-                                    <input
-                                        type="text"
-                                        value={productoFiltro}
-                                        onChange={(e) => setProductoFiltro(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key !== 'Enter') return
-                                            e.preventDefault()
-                                            e.stopPropagation()
-                                            const first = productosFiltrados?.[0]
-                                            if (first?._id) setSelectedProducto(first._id)
-                                        }}
-                                        placeholder="Buscar producto..."
-                                        className="input-field w-full sm:w-56"
-                                    />
-                                    <select
+                                    <ProductCombobox
+                                        products={productos}
                                         value={selectedProducto || ''}
-                                        onChange={(e) => setSelectedProducto(e.target.value)}
+                                        onChange={(id) => setSelectedProducto(id)}
+                                        placeholder="Seleccionar producto"
                                         className="input-field w-full sm:flex-1"
-                                    >
-                                        <option value="">Seleccionar producto</option>
-                                        {productosFiltrados.map((prod) => (
-                                            <option key={prod._id} value={prod._id}>
-                                                {prod.nombre} - ${prod.precio.toLocaleString()}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <div className="flex w-full sm:w-auto items-center border border-slate-600 rounded h-10 sm:h-auto">
+                                    />
+                                    <div className="flex w-full sm:w-auto items-center border border-slate-600 rounded h-10">
                                         <button
                                             onClick={() => setCantidad(Math.max(1, (parseInt(cantidad) || 1) - 1))}
-                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
+                                            className="w-10 h-10 flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                             type="button"
                                         >
                                             -
@@ -587,12 +559,12 @@ const Pedidos = () => {
                                             type="number"
                                             value={cantidad}
                                             onChange={(e) => setCantidad(e.target.value)}
-                                            className="flex-1 sm:flex-none sm:w-12 h-10 sm:h-auto text-center text-white bg-transparent border-0 focus:outline-none focus:ring-0 leading-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            className="flex-1 sm:flex-none sm:w-12 h-10 text-center text-white bg-transparent border-0 focus:outline-none focus:ring-0 leading-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             min="1"
                                         />
                                         <button
                                             onClick={() => setCantidad((parseInt(cantidad) || 1) + 1)}
-                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
+                                            className="w-10 h-10 flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                             type="button"
                                         >
                                             +
@@ -631,10 +603,10 @@ const Pedidos = () => {
                                                         )}
                                                 </span>
                                                 <div className="flex items-center space-x-2">
-                                                    <div className="flex items-center border border-slate-600 rounded h-10 sm:h-auto">
+                                                    <div className="flex items-center border border-slate-600 rounded h-10">
                                                         <button
                                                             onClick={() => updateItemQuantity(idx, item.cantidad - 1)}
-                                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
+                                                            className="w-10 h-10 flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                                             type="button"
                                                         >
                                                             -
@@ -644,11 +616,11 @@ const Pedidos = () => {
                                                             value={item.cantidad}
                                                             onChange={(e) => updateItemQuantity(idx, e.target.value)}
                                                             min="1"
-                                                            className="w-12 h-10 sm:h-auto text-center text-white bg-slate-700 border-0 focus:outline-none focus:ring-0 leading-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                            className="w-12 h-10 text-center text-white bg-slate-700 border-0 focus:outline-none focus:ring-0 leading-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                         />
                                                         <button
                                                             onClick={() => updateItemQuantity(idx, item.cantidad + 1)}
-                                                            className="w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
+                                                            className="w-10 h-10 flex items-center justify-center text-white hover:bg-slate-600 transition-colors"
                                                             type="button"
                                                         >
                                                             +
