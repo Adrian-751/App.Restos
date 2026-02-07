@@ -220,6 +220,8 @@ const Pedidos = () => {
 
             const payload = {
                 ...data,
+                mesaId: data.mesaId ? data.mesaId : null,
+                clienteId: data.clienteId ? data.clienteId : null,
                 ...(data.clienteId ? { estado: 'Cuenta Corriente' } : {}),
             }
 

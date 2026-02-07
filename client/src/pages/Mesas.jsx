@@ -422,6 +422,8 @@ const Mesas = () => {
 
             const payload = {
                 ...data,
+                mesaId: data.mesaId ? data.mesaId : null,
+                clienteId: data.clienteId ? data.clienteId : null,
                 ...(data.clienteId ? { estado: 'Cuenta Corriente' } : {}),
             }
 
@@ -455,7 +457,7 @@ const Mesas = () => {
     })
     useModalHotkeys({
         isOpen: showPedidoModal,
-        onCancel: () => { setShowPedidoModal(false); setPedidoFormData({ mesaId: '', items: [] }); setEditingPedidoId(null) },
+        onCancel: () => { setShowPedidoModal(false); setPedidoFormData({ mesaId: '', clienteId: '', items: [] }); setEditingPedidoId(null) },
         onConfirm: savePedido,
     })
 

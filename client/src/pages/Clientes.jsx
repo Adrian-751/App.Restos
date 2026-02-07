@@ -173,6 +173,8 @@ const Clientes = () => {
 
             await api.put(`/pedidos/${pedidoEditando._id}`, {
                 ...pedidoEditando,
+                mesaId: pedidoEditando.mesaId ? pedidoEditando.mesaId : null,
+                clienteId: pedidoEditando.clienteId ? pedidoEditando.clienteId : null,
                 items: pedidoFormData.items,
                 total: total,
             })

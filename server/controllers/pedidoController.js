@@ -65,6 +65,10 @@ export const updatePedido = asyncHandler(async (req, res) => {
     const estadoAnterior = pedido.estado;
     const estadoNuevo = req.body.estado;
 
+    // Sanitizar IDs (evita CastError cuando viene "" desde selects)
+    if (req.body.mesaId === '') req.body.mesaId = null
+    if (req.body.clienteId === '') req.body.clienteId = null
+
     // 1) Caja: sumar pagos parciales (delta efectivo/transferencia) aunque NO esté Cobrado
     // Esto permite que Caja/Gestión/Métricas reflejen ingresos en tiempo real.
     {
