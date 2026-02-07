@@ -166,9 +166,21 @@ const Pedidos = () => {
             precioOriginal: producto.precio,
         }
 
-        setFormData({
-            ...formData,
-            items: [...formData.items, newItem],
+        setFormData((prev) => {
+            const items = Array.isArray(prev.items) ? [...prev.items] : []
+            const idx = items.findIndex(
+                (it) =>
+                    String(it?.productoId) === String(newItem.productoId) &&
+                    Number(it?.precio) === Number(newItem.precio)
+            )
+            if (idx >= 0) {
+                items[idx] = {
+                    ...items[idx],
+                    cantidad: Number(items[idx]?.cantidad || 0) + Number(newItem.cantidad || 0),
+                }
+                return { ...prev, items }
+            }
+            return { ...prev, items: [...items, newItem] }
         })
         setSelectedProducto(null)
         setCantidad(1)

@@ -6,14 +6,22 @@ import { getTodayYMD } from '../utils/date.js'
  * GET /api/mesas
  */
 export const getMesas = asyncHandler(async (req, res) => {
-    const { Mesa, AppState } = req.models
+    const { Mesa, AppState, Pedido } = req.models
 
     // Reset diario del "nombre" de las mesas (mantiene número/posiciones/config)
     const hoy = getTodayYMD()
     const KEY = 'mesaNombreResetYMD'
     const state = await AppState.findOne({ key: KEY }).lean()
     if (state?.value !== hoy) {
-        await Mesa.updateMany({}, { $set: { nombre: '' } })
+        // NO borrar nombre si hay pedidos sin cobrar asociados a la mesa (aunque sea de días anteriores)
+        const mesasConPedidosAbiertos = await Pedido.distinct('mesaId', {
+            mesaId: { $ne: null },
+            estado: { $nin: ['Cobrado', 'Cancelado'] }
+        })
+        await Mesa.updateMany(
+            { _id: { $nin: mesasConPedidosAbiertos } },
+            { $set: { nombre: '' } }
+        )
         await AppState.findOneAndUpdate(
             { key: KEY },
             { $set: { value: hoy } },
