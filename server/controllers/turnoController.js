@@ -75,21 +75,32 @@ export const getTurnos = asyncHandler(async (req, res) => {
  */
 export const createTurno = asyncHandler(async (req, res) => {
     const { Turno } = req.models
-    const { nombre, pedidoId, mesaId, clienteId, total, efectivo, transferencia, observaciones } = req.body;
+    const { nombre, pedidoId, mesaId, clienteId, total, efectivo, transferencia, observaciones, fecha } = req.body;
+
+    // Si se proporciona una fecha, usar esa fecha para contar turnos y crear el turno
+    // Si no, usar la fecha de hoy
+    let fechaBase = new Date()
+    if (fecha) {
+        // La fecha viene en formato YYYY-MM-DD, convertir a Date
+        const fechaDate = new Date(fecha + 'T12:00:00') // Usar mediodía para evitar problemas de timezone
+        if (!isNaN(fechaDate.getTime())) {
+            fechaBase = fechaDate
+        }
+    }
 
     // Contar turnos del día para asignar número automático
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const finDia = new Date(hoy);
-    finDia.setHours(23, 59, 59, 999);
+    const inicioDia = new Date(fechaBase)
+    inicioDia.setHours(0, 0, 0, 0)
+    const finDia = new Date(fechaBase)
+    finDia.setHours(23, 59, 59, 999)
 
-    const turnosHoy = await Turno.countDocuments({
-        createdAt: { $gte: hoy, $lte: finDia }
-    });
+    const turnosDia = await Turno.countDocuments({
+        createdAt: { $gte: inicioDia, $lte: finDia }
+    })
 
-    const numeroTurno = turnosHoy + 1;
+    const numeroTurno = turnosDia + 1
 
-    const turno = await Turno.create({
+    const turnoData = {
         nombre: nombre || '',
         numero: numeroTurno,
         pedidoId: pedidoId || null,
@@ -100,10 +111,21 @@ export const createTurno = asyncHandler(async (req, res) => {
         transferencia: parseFloat(transferencia) || 0,
         observaciones: observaciones || '',
         estado: 'Pendiente'
-    });
+    }
 
-    res.status(201).json(turno);
-});
+    // Si hay fecha personalizada, establecer createdAt
+    if (fecha) {
+        const fechaDate = new Date(fecha + 'T12:00:00')
+        if (!isNaN(fechaDate.getTime())) {
+            turnoData.createdAt = fechaDate
+            turnoData.updatedAt = fechaDate
+        }
+    }
+
+    const turno = await Turno.create(turnoData)
+
+    res.status(201).json(turno)
+})
 
 /**
  * Actualizar turno
@@ -134,13 +156,10 @@ export const updateTurno = asyncHandler(async (req, res) => {
             const fechaTurno = turno.createdAt ? new Date(turno.createdAt).toISOString().split("T")[0] : null
             let caja = null
             if (fechaTurno) {
-                // Buscar caja abierta de esa fecha
+                // Buscar SOLO caja abierta de esa fecha específica (no hacer fallback a otras fechas)
                 caja = await Caja.findOne({ fecha: fechaTurno, cerrada: false }).sort({ createdAt: -1 })
             }
-            // Si no hay caja de esa fecha, buscar cualquier caja abierta (fallback)
-            if (!caja) {
-                caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 })
-            }
+            // Solo registrar si encontramos la caja de esa fecha específica
             if (caja) {
                 caja.totalEfectivo = (caja.totalEfectivo || 0) + deltaE
                 caja.totalTransferencia = (caja.totalTransferencia || 0) + deltaT
@@ -170,13 +189,10 @@ export const updateTurno = asyncHandler(async (req, res) => {
         const fechaTurno = turno.createdAt ? new Date(turno.createdAt).toISOString().split("T")[0] : null
         let caja = null
         if (fechaTurno) {
-            // Buscar caja abierta de esa fecha
+            // Buscar SOLO caja abierta de esa fecha específica (no hacer fallback a otras fechas)
             caja = await Caja.findOne({ fecha: fechaTurno, cerrada: false }).sort({ createdAt: -1 })
         }
-        // Si no hay caja de esa fecha, buscar cualquier caja abierta (fallback)
-        if (!caja) {
-            caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 })
-        }
+        // Solo registrar si encontramos la caja de esa fecha específica
 
         if (caja) {
             const efectivo = parseFloat(req.body.efectivo) || turno.efectivo || 0;

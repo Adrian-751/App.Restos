@@ -307,13 +307,24 @@ const Mesas = () => {
             try {
                 const res = await api.get('/pedidos')
                 const pedidosArray = Array.isArray(res.data) ? res.data : []
+                // Obtener la fecha de la caja seleccionada desde localStorage
+                const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+
                 const candidatos = pedidosArray.filter((p) => {
                     if (!p) return false
                     const mid = typeof p.mesaId === 'object' && p.mesaId !== null ? p.mesaId._id : p.mesaId
                     if (!mid) return false
                     if (String(mid) !== String(mesaId)) return false
                     const est = String(p.estado || '').toLowerCase()
-                    return est !== 'cobrado' && est !== 'cancelado'
+                    if (est === 'cobrado' || est === 'cancelado') return false
+
+                    // Si hay una fecha de caja seleccionada, filtrar por esa fecha
+                    if (fechaCajaSeleccionada && p.createdAt) {
+                        const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                        return fechaPedido === fechaCajaSeleccionada
+                    }
+
+                    return true
                 })
                 const existente = candidatos.sort(
                     (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
@@ -437,6 +448,12 @@ const Mesas = () => {
                 mesaId: data.mesaId ? data.mesaId : null,
                 clienteId: data.clienteId ? data.clienteId : null,
                 ...(data.clienteId ? { estado: 'Cuenta Corriente' } : {}),
+            }
+
+            // Agregar fecha de la caja seleccionada si existe (solo al crear, no al editar)
+            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            if (fechaCajaSeleccionada && !editingPedidoId) {
+                payload.fecha = fechaCajaSeleccionada
             }
 
             if (editingPedidoId) {

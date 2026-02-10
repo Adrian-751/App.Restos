@@ -81,13 +81,24 @@ const Caja = () => {
         const cantidadTurnosFinal = cantidadTurnos + turnosDesdePedidos.cantidad
         const totalTurnosFinal = totalTurnos + turnosDesdePedidos.total
 
+        // Recalcular efectivo y transferencia SOLO de pedidos y turnos de esta fecha
+        // para evitar que se crucen datos entre cajas de diferentes fechas
+        const efectivoDePedidos = pedidosCobradosFecha.reduce((sum, p) => sum + (parseFloat(p.efectivo) || 0), 0)
+        const transferenciaDePedidos = pedidosCobradosFecha.reduce((sum, p) => sum + (parseFloat(p.transferencia) || 0), 0)
+
+        const efectivoDeTurnos = turnosFecha.reduce((sum, t) => sum + (parseFloat(t.efectivo) || 0), 0)
+        const transferenciaDeTurnos = turnosFecha.reduce((sum, t) => sum + (parseFloat(t.transferencia) || 0), 0)
+
+        const totalEfectivoFecha = efectivoDePedidos + efectivoDeTurnos
+        const totalTransferenciaFecha = transferenciaDePedidos + transferenciaDeTurnos
+
         return {
-            totalEfectivo: cajaData.totalEfectivo || 0,
-            totalTransferencia: cajaData.totalTransferencia || 0,
+            totalEfectivo: totalEfectivoFecha,
+            totalTransferencia: totalTransferenciaFecha,
             totalMontoInicial: cajaData.montoInicial || 0,
             egresos: egresosTotal,
             turnos: { cantidad: cantidadTurnosFinal, total: totalTurnosFinal },
-            total: (cajaData.totalEfectivo || 0) + (cajaData.totalTransferencia || 0) + (cajaData.montoInicial || 0),
+            total: totalEfectivoFecha + totalTransferenciaFecha + (cajaData.montoInicial || 0),
         }
     }
 
@@ -104,16 +115,49 @@ const Caja = () => {
             const cajasAbiertasArray = Array.isArray(cajasAbiertasRes.data) ? cajasAbiertasRes.data : []
             setCajasAbiertas(cajasAbiertasArray)
 
-            // Si hay una caja seleccionada, mantenerla; si no, usar la principal (más reciente)
+            // Intentar restaurar la caja seleccionada desde localStorage
+            const cajaSeleccionadaId = localStorage.getItem('cajaSeleccionadaId')
+
+            // Determinar qué caja mostrar
+            let cajaAMostrar = null
+
+            // Si hay una caja seleccionada en el estado y sigue abierta, mantenerla
             if (caja && cajasAbiertasArray.find(c => c._id === caja._id)) {
-                // La caja actual sigue abierta, mantenerla
                 const cajaActualizada = cajasAbiertasArray.find(c => c._id === caja._id)
-                if (cajaActualizada) setCaja(cajaActualizada)
-            } else {
-                // Usar la caja principal (más reciente) o la primera disponible
-                setCaja(cajaRes.data || cajasAbiertasArray[0] || null)
+                if (cajaActualizada) {
+                    cajaAMostrar = cajaActualizada
+                    localStorage.setItem('cajaSeleccionadaId', cajaActualizada._id)
+                    localStorage.setItem('cajaSeleccionadaFecha', cajaActualizada.fecha)
+                }
             }
 
+            // Si no hay caja en el estado, intentar restaurar desde localStorage
+            if (!cajaAMostrar && cajaSeleccionadaId) {
+                const cajaGuardada = cajasAbiertasArray.find(c => c._id === cajaSeleccionadaId)
+                if (cajaGuardada) {
+                    cajaAMostrar = cajaGuardada
+                    localStorage.setItem('cajaSeleccionadaFecha', cajaGuardada.fecha)
+                } else {
+                    // La caja guardada ya no está abierta, limpiar localStorage
+                    localStorage.removeItem('cajaSeleccionadaId')
+                    localStorage.removeItem('cajaSeleccionadaFecha')
+                }
+            }
+
+            // Si no hay caja seleccionada o guardada, usar la principal (más reciente)
+            if (!cajaAMostrar) {
+                cajaAMostrar = cajaRes.data || cajasAbiertasArray[0] || null
+                if (cajaAMostrar) {
+                    localStorage.setItem('cajaSeleccionadaId', cajaAMostrar._id)
+                    localStorage.setItem('cajaSeleccionadaFecha', cajaAMostrar.fecha)
+                } else {
+                    // No hay cajas abiertas, limpiar localStorage
+                    localStorage.removeItem('cajaSeleccionadaId')
+                    localStorage.removeItem('cajaSeleccionadaFecha')
+                }
+            }
+
+            setCaja(cajaAMostrar)
             setTurnos(turnosRes.data || [])
             setPedidos(pedidosRes.data || [])
         } catch (error) {
@@ -199,7 +243,12 @@ const Caja = () => {
                     payload.fecha = fechaParaEnviar
                 }
             }
-            await api.post('/caja/abrir', payload)
+            const res = await api.post('/caja/abrir', payload)
+            // Guardar la caja abierta en localStorage
+            if (res.data) {
+                localStorage.setItem('cajaSeleccionadaId', res.data._id)
+                localStorage.setItem('cajaSeleccionadaFecha', res.data.fecha)
+            }
             setMontoInicial('')
             setFechaCaja('') // Resetear fecha
             fetchCaja()
@@ -229,8 +278,10 @@ const Caja = () => {
                 payload.fecha = fechaParaEnviar
             }
             const res = await api.post('/caja/abrir', payload)
-            // Mostrar la caja que se acaba de abrir
+            // Mostrar la caja que se acaba de abrir y guardarla en localStorage
             setCaja(res.data)
+            localStorage.setItem('cajaSeleccionadaId', res.data._id)
+            localStorage.setItem('cajaSeleccionadaFecha', res.data.fecha)
             setMontoInicialOtra('')
             setFechaCajaOtra('')
             setShowAbrirOtraCaja(false)
@@ -247,6 +298,12 @@ const Caja = () => {
         const cajaSeleccionada = cajasAbiertas.find(c => c._id === cajaId)
         if (cajaSeleccionada) {
             setCaja(cajaSeleccionada)
+            // Guardar la caja seleccionada en localStorage para persistirla
+            localStorage.setItem('cajaSeleccionadaId', cajaSeleccionada._id)
+            // Guardar también la fecha para que otras páginas puedan filtrar por fecha
+            localStorage.setItem('cajaSeleccionadaFecha', cajaSeleccionada.fecha)
+            // Disparar evento para que otras páginas se actualicen
+            window.dispatchEvent(new Event('caja-seleccionada-cambiada'))
         }
     }
 
@@ -259,9 +316,14 @@ const Caja = () => {
 
             // Si se cerró la caja actual, cambiar a otra caja abierta si existe
             if (cajasAbiertasActualizadas.length > 0) {
-                setCaja(cajasAbiertasActualizadas[0]) // Cambiar a la primera caja abierta disponible
+                const nuevaCaja = cajasAbiertasActualizadas[0]
+                setCaja(nuevaCaja) // Cambiar a la primera caja abierta disponible
+                localStorage.setItem('cajaSeleccionadaId', nuevaCaja._id)
+                localStorage.setItem('cajaSeleccionadaFecha', nuevaCaja.fecha)
             } else {
                 setCaja(null) // No hay más cajas abiertas
+                localStorage.removeItem('cajaSeleccionadaId')
+                localStorage.removeItem('cajaSeleccionadaFecha')
             }
             fetchCaja()
             fetchCajasCerradas()

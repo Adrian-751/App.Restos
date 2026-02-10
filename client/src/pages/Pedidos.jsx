@@ -42,15 +42,46 @@ const Pedidos = () => {
         fetchProductos()
         fetchMesas()
         fetchClientes()
+
+        // Escuchar cambios en la caja seleccionada (localStorage)
+        const handleStorageChange = (e) => {
+            if (e.key === 'cajaSeleccionadaFecha' || e.key === null) {
+                fetchPedidos()
+            }
+        }
+        window.addEventListener('storage', handleStorageChange)
+
+        // También escuchar eventos personalizados cuando se cambia la caja desde la misma pestaña
+        const handleCajaChange = () => {
+            fetchPedidos()
+        }
+        window.addEventListener('caja-seleccionada-cambiada', handleCajaChange)
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange)
+            window.removeEventListener('caja-seleccionada-cambiada', handleCajaChange)
+        }
     }, [])
 
     const fetchPedidos = async () => {
         try {
             const res = await api.get('/pedidos')
+            // Obtener la fecha de la caja seleccionada desde localStorage
+            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+
             // Mostrar todos los pedidos NO cobrados (incluye cuenta corriente / pagos parciales)
+            // Y filtrar por fecha de la caja seleccionada si existe
             const pedidosFiltrados = res.data.filter((p) => {
                 const est = String(p?.estado || '').toLowerCase()
-                return est !== 'cobrado' && est !== 'cancelado'
+                if (est === 'cobrado' || est === 'cancelado') return false
+
+                // Si hay una fecha de caja seleccionada, filtrar por esa fecha
+                if (fechaCajaSeleccionada && p.createdAt) {
+                    const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                    return fechaPedido === fechaCajaSeleccionada
+                }
+
+                return true
             })
             setPedidos(pedidosFiltrados)
         } catch (error) {
@@ -247,10 +278,20 @@ const Pedidos = () => {
                 try {
                     const res = await api.get('/pedidos')
                     const pedidosArray = Array.isArray(res.data) ? res.data : []
+                    // Obtener la fecha de la caja seleccionada desde localStorage
+                    const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+
                     const candidatos = pedidosArray.filter((p) => {
                         if (!p) return false
                         const est = String(p.estado || '').toLowerCase()
                         if (est === 'cobrado' || est === 'cancelado') return false
+
+                        // Si hay una fecha de caja seleccionada, filtrar por esa fecha
+                        if (fechaCajaSeleccionada && p.createdAt) {
+                            const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                            if (fechaPedido !== fechaCajaSeleccionada) return false
+                        }
+
                         if (payload.mesaId) {
                             const mid = typeof p.mesaId === 'object' && p.mesaId !== null ? p.mesaId._id : p.mesaId
                             if (String(mid) !== String(payload.mesaId)) return false
@@ -288,6 +329,12 @@ const Pedidos = () => {
                     // si falla la búsqueda, seguimos con create normal
                     console.error('Error buscando pedido existente:', e)
                 }
+            }
+
+            // Agregar fecha de la caja seleccionada si existe
+            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            if (fechaCajaSeleccionada && !editingPedido) {
+                payload.fecha = fechaCajaSeleccionada
             }
 
             if (editingPedido) await api.put(`/pedidos/${editingPedido._id}`, payload)

@@ -40,20 +40,52 @@ const Turnos = () => {
         // Escuchar eventos de actualización
         const handleUpdate = () => {
             fetchTurnos()
+            fetchPedidos()
         }
         window.addEventListener('caja-updated', handleUpdate)
         window.addEventListener('turno-updated', handleUpdate)
 
+        // Escuchar cambios en la caja seleccionada (localStorage)
+        const handleStorageChange = (e) => {
+            if (e.key === 'cajaSeleccionadaFecha' || e.key === null) {
+                fetchTurnos()
+                fetchPedidos()
+            }
+        }
+        window.addEventListener('storage', handleStorageChange)
+
+        // También escuchar eventos personalizados cuando se cambia la caja desde la misma pestaña
+        const handleCajaChange = () => {
+            fetchTurnos()
+            fetchPedidos()
+        }
+        window.addEventListener('caja-seleccionada-cambiada', handleCajaChange)
+
         return () => {
             window.removeEventListener('caja-updated', handleUpdate)
             window.removeEventListener('turno-updated', handleUpdate)
+            window.removeEventListener('storage', handleStorageChange)
+            window.removeEventListener('caja-seleccionada-cambiada', handleCajaChange)
         }
     }, [])
 
     const fetchTurnos = async () => {
         try {
             const res = await api.get('/turnos')
-            setTurnos(res.data)
+            // Obtener la fecha de la caja seleccionada desde localStorage
+            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+
+            // Si hay una fecha de caja seleccionada, filtrar turnos por esa fecha
+            let turnosFiltrados = res.data
+            if (fechaCajaSeleccionada) {
+                turnosFiltrados = res.data.filter((t) => {
+                    if (!t || !t.createdAt) return false
+                    const fechaTurno = new Date(t.createdAt).toISOString().split("T")[0]
+                    return fechaTurno === fechaCajaSeleccionada
+                })
+            }
+
+            setTurnos(turnosFiltrados)
         } catch (error) {
             console.error('Error fetching turnos:', error)
         }
@@ -62,7 +94,20 @@ const Turnos = () => {
     const fetchPedidos = async () => {
         try {
             const res = await api.get('/pedidos')
-            const pedidosFiltrados = res.data.filter(p => p.estado?.toLowerCase() !== 'cobrado')
+            // Obtener la fecha de la caja seleccionada desde localStorage
+            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+
+            let pedidosFiltrados = res.data.filter(p => p.estado?.toLowerCase() !== 'cobrado')
+
+            // Si hay una fecha de caja seleccionada, filtrar pedidos por esa fecha
+            if (fechaCajaSeleccionada) {
+                pedidosFiltrados = pedidosFiltrados.filter((p) => {
+                    if (!p || !p.createdAt) return false
+                    const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                    return fechaPedido === fechaCajaSeleccionada
+                })
+            }
+
             setPedidos(pedidosFiltrados)
         } catch (error) {
             console.error('Error fetching pedidos:', error)
@@ -159,6 +204,12 @@ const Turnos = () => {
                 data.pedidoId = null
                 data.mesaId = null
                 data.clienteId = null
+            }
+
+            // Agregar fecha de la caja seleccionada si existe (solo al crear, no al editar)
+            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            if (fechaCajaSeleccionada && !editingTurno) {
+                data.fecha = fechaCajaSeleccionada
             }
 
             if (editingTurno) {

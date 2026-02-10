@@ -21,7 +21,7 @@ export const getPedidos = asyncHandler(async (req, res) => {
  */
 export const createPedido = asyncHandler(async (req, res) => {
     const { Pedido, Cliente } = req.models
-    const { nombre, mesaId, clienteId, items, total, observaciones } = req.body;
+    const { nombre, mesaId, clienteId, items, total, observaciones, fecha } = req.body;
 
     // Determinar estado inicial
     let estado = 'Pendiente';
@@ -36,7 +36,17 @@ export const createPedido = asyncHandler(async (req, res) => {
         }
     }
 
-    const pedido = await Pedido.create({
+    // Si se proporciona una fecha, convertirla a Date para createdAt
+    let createdAt = undefined
+    if (fecha) {
+        // La fecha viene en formato YYYY-MM-DD, convertir a Date
+        const fechaDate = new Date(fecha + 'T12:00:00') // Usar mediodía para evitar problemas de timezone
+        if (!isNaN(fechaDate.getTime())) {
+            createdAt = fechaDate
+        }
+    }
+
+    const pedidoData = {
         nombre: (nombre ?? '').toString(),
         mesaId: mesaId || null,
         clienteId: clienteId || null,
@@ -46,7 +56,15 @@ export const createPedido = asyncHandler(async (req, res) => {
         transferencia: 0,
         observaciones: observaciones || '',
         estado
-    });
+    }
+
+    // Si hay fecha personalizada, establecer createdAt
+    if (createdAt) {
+        pedidoData.createdAt = createdAt
+        pedidoData.updatedAt = createdAt
+    }
+
+    const pedido = await Pedido.create(pedidoData);
 
     res.status(201).json(pedido);
 });
@@ -85,13 +103,10 @@ export const updatePedido = asyncHandler(async (req, res) => {
             const fechaPedido = pedido.createdAt ? new Date(pedido.createdAt).toISOString().split("T")[0] : null
             let caja = null
             if (fechaPedido) {
-                // Buscar caja abierta de esa fecha
+                // Buscar SOLO caja abierta de esa fecha específica (no hacer fallback a otras fechas)
                 caja = await Caja.findOne({ fecha: fechaPedido, cerrada: false }).sort({ createdAt: -1 })
             }
-            // Si no hay caja de esa fecha, buscar cualquier caja abierta (fallback)
-            if (!caja) {
-                caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 })
-            }
+            // Solo registrar si encontramos la caja de esa fecha específica
             if (caja) {
                 caja.totalEfectivo = (caja.totalEfectivo || 0) + deltaE
                 caja.totalTransferencia = (caja.totalTransferencia || 0) + deltaT
@@ -171,14 +186,10 @@ export const updatePedido = asyncHandler(async (req, res) => {
         const fechaPedido = pedido.createdAt ? new Date(pedido.createdAt).toISOString().split("T")[0] : null
         let caja = null
         if (fechaPedido) {
-            // Buscar caja abierta de esa fecha
+            // Buscar SOLO caja abierta de esa fecha específica (no hacer fallback a otras fechas)
             caja = await Caja.findOne({ fecha: fechaPedido, cerrada: false }).sort({ createdAt: -1 })
         }
-        // Si no hay caja de esa fecha, buscar cualquier caja abierta (fallback)
-        if (!caja) {
-            caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 })
-        }
-
+        // Solo registrar si encontramos la caja de esa fecha específica
         if (caja) {
             const efectivo = parseFloat(req.body.efectivo) || 0;
             const transferencia = parseFloat(req.body.transferencia) || 0;
