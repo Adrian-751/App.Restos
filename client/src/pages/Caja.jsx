@@ -175,7 +175,7 @@ const Caja = () => {
                     >
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Monto Inicial
+                                Monto Inicial (Nuevo)
                             </label>
                             <input
                                 type="number"
@@ -197,10 +197,10 @@ const Caja = () => {
                                     value={fechaCaja}
                                     onChange={(e) => {
                                         let value = e.target.value.replace(/\D/g, '') // Solo números
-                                        
+
                                         // Limitar a 8 dígitos (DDMMYYYY)
                                         if (value.length > 8) value = value.slice(0, 8)
-                                        
+
                                         // Formatear como DD/MM/YYYY
                                         let formatted = value
                                         if (value.length > 2) {
@@ -209,12 +209,12 @@ const Caja = () => {
                                         if (value.length > 4) {
                                             formatted = value.slice(0, 2) + '/' + value.slice(2, 4) + '/' + value.slice(4, 8)
                                         }
-                                        
+
                                         setFechaCaja(formatted)
                                     }}
                                     onKeyDown={(e) => {
                                         const nums = fechaCaja.replace(/\D/g, '')
-                                        
+
                                         // Backspace: si está en posición de separador, borrar también el separador
                                         if (e.key === 'Backspace' && (fechaCaja.endsWith('/') || fechaCaja.length === 3 || fechaCaja.length === 6)) {
                                             e.preventDefault()
@@ -224,7 +224,7 @@ const Caja = () => {
                                             if (newNums.length > 4) formatted = newNums.slice(0, 2) + '/' + newNums.slice(2, 4) + '/' + newNums.slice(4)
                                             setFechaCaja(formatted)
                                         }
-                                        
+
                                         // Al escribir números, avanzar automáticamente después de 2 y 4 dígitos
                                         if (e.key >= '0' && e.key <= '9' && nums.length < 8) {
                                             setTimeout(() => {
@@ -244,7 +244,7 @@ const Caja = () => {
                                             const day = parseInt(parts[0], 10)
                                             const month = parseInt(parts[1], 10)
                                             const year = parseInt(parts[2], 10)
-                                            
+
                                             // Validar rangos
                                             if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
                                                 const date = new Date(year, month - 1, day)
