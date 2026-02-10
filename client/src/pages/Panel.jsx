@@ -209,39 +209,6 @@ const Panel = () => {
                     </div>
                 </div>
 
-                <div className="card bg-gradient-to-br from-slate-700 to-slate-900">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-slate-200 text-sm">Egresos Hoy</p>
-                            <p className="text-2xl font-bold text-white mt-1">
-                                ${Number(stats.egresosHoy?.total || 0).toLocaleString()}
-                            </p>
-                            {(Number(stats.egresosHoy?.total || 0) > 0) && (
-                                <p className="text-xs font-semibold text-slate-200 mt-1">
-                                    Ef: ${Number(stats.egresosHoy?.efectivo || 0).toLocaleString()} / Tr: ${Number(stats.egresosHoy?.transferencia || 0).toLocaleString()}
-                                </p>
-                            )}
-                        </div>
-                        <span className="text-4xl">↘️</span>
-                    </div>
-                </div>
-
-                <div className="card bg-gradient-to-br from-green-600 to-green-800">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-purple-200 text-sm">Total Hoy</p>
-                            {stats.turnosHoy.cantidad > 0 && (
-                                <p className="text-sm font-semibold text-green-100 mt-1">
-                                    Turnos: x{stats.turnosHoy.cantidad} = ${stats.turnosHoy.total.toLocaleString()}
-                                </p>
-                            )}
-                            <p className="text-2xl font-bold text-white mt-1">
-                                ${stats.totalHoy.toLocaleString()}
-                            </p>
-                        </div>
-                        <span className="text-4xl">💵</span>
-                    </div>
-                </div>
             </div>
         </div>
     )

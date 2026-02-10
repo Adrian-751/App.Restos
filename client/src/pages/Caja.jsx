@@ -7,10 +7,17 @@ import { useModalHotkeys } from '../hooks/useModalHotkeys'
 const Caja = () => {
     const [montoInicial, setMontoInicial] = useState('')
     const [fechaCaja, setFechaCaja] = useState('') // Fecha para abrir caja (opcional)
-    const [caja, setCaja] = useState(null)
+    const [montoInicialOtra, setMontoInicialOtra] = useState('')
+    const [fechaCajaOtra, setFechaCajaOtra] = useState('') // Fecha para abrir otra caja
+    const [caja, setCaja] = useState(null) // Caja actualmente seleccionada/visible
+    const [cajasAbiertas, setCajasAbiertas] = useState([]) // Todas las cajas abiertas
+    const [cajasCerradas, setCajasCerradas] = useState([])
+    const [turnos, setTurnos] = useState([])
+    const [pedidos, setPedidos] = useState([])
     const dateInputRef = useRef(null)
     const [showCerrarConfirm, setShowCerrarConfirm] = useState(false)
     const [showEgresoModal, setShowEgresoModal] = useState(false)
+    const [showAbrirOtraCaja, setShowAbrirOtraCaja] = useState(false)
     const [egresoData, setEgresoData] = useState({
         efectivo: '',
         transferencia: '',
@@ -18,28 +25,119 @@ const Caja = () => {
     })
 
     // Calcular resumen desde caja
-    const resumen = caja ? {
-        totalEfectivo: caja.totalEfectivo || 0,
-        totalTransferencia: caja.totalTransferencia || 0,
-        totalMontoInicial: caja.montoInicial || 0,
-        total: (caja.totalEfectivo || 0) + (caja.totalTransferencia || 0) + (caja.montoInicial || 0),
-    } : null
+    const calcularResumen = (cajaData) => {
+        if (!cajaData) return null
+
+        // Calcular egresos
+        const egresosArray = Array.isArray(cajaData.egresos) ? cajaData.egresos : []
+        const egresosTotal = egresosArray.reduce(
+            (acc, e) => {
+                acc.efectivo += Number(e?.efectivo || 0)
+                acc.transferencia += Number(e?.transferencia || 0)
+                return acc
+            },
+            { efectivo: 0, transferencia: 0 }
+        )
+        egresosTotal.total = (egresosTotal.efectivo || 0) + (egresosTotal.transferencia || 0)
+
+        // Calcular turnos por fecha de la caja
+        const fechaCaja = cajaData.fecha
+        const turnosArray = Array.isArray(turnos) ? turnos : []
+        const turnosFecha = turnosArray.filter((t) => {
+            if (!t || !t.createdAt) return false
+            const fechaTurno = new Date(t.createdAt).toISOString().split("T")[0]
+            return fechaTurno === fechaCaja && t.estado?.toLowerCase() === 'cobrado'
+        })
+        const cantidadTurnos = turnosFecha.length
+        const totalTurnos = turnosFecha.reduce((sum, t) => sum + (parseFloat(t.total) || 0), 0)
+
+        // También contar turnos desde pedidos
+        const TURNO_PRODUCTO_NOMBRE = 'turno futbol'
+        const pedidosArray = Array.isArray(pedidos) ? pedidos : []
+        const pedidosCobradosFecha = pedidosArray.filter((p) => {
+            if (!p || !p.createdAt) return false
+            const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+            return fechaPedido === fechaCaja && String(p.estado || '').toLowerCase() === 'cobrado'
+        })
+
+        const turnosDesdePedidos = pedidosCobradosFecha.reduce(
+            (acc, p) => {
+                const items = Array.isArray(p.items) ? p.items : []
+                for (const it of items) {
+                    const nombre = String(it?.nombre || '').trim().toLowerCase()
+                    if (nombre !== TURNO_PRODUCTO_NOMBRE) continue
+                    const cantidad = Number(it?.cantidad || 0)
+                    const subtotal = Number(
+                        it?.subtotal ?? ((Number(it?.precio || 0) * cantidad) || 0)
+                    )
+                    acc.cantidad += cantidad
+                    acc.total += subtotal
+                }
+                return acc
+            },
+            { cantidad: 0, total: 0 }
+        )
+
+        const cantidadTurnosFinal = cantidadTurnos + turnosDesdePedidos.cantidad
+        const totalTurnosFinal = totalTurnos + turnosDesdePedidos.total
+
+        return {
+            totalEfectivo: cajaData.totalEfectivo || 0,
+            totalTransferencia: cajaData.totalTransferencia || 0,
+            totalMontoInicial: cajaData.montoInicial || 0,
+            egresos: egresosTotal,
+            turnos: { cantidad: cantidadTurnosFinal, total: totalTurnosFinal },
+            total: (cajaData.totalEfectivo || 0) + (cajaData.totalTransferencia || 0) + (cajaData.montoInicial || 0),
+        }
+    }
+
+    const resumen = calcularResumen(caja)
 
     const fetchCaja = async () => {
         try {
-            const res = await api.get('/caja/estado')
-            setCaja(res.data)
+            const [cajaRes, cajasAbiertasRes, turnosRes, pedidosRes] = await Promise.all([
+                api.get('/caja/estado').catch(() => ({ data: null })),
+                api.get('/caja/todas?cerradas=false').catch(() => ({ data: [] })),
+                api.get('/turnos').catch(() => ({ data: [] })),
+                api.get('/pedidos').catch(() => ({ data: [] })),
+            ])
+            const cajasAbiertasArray = Array.isArray(cajasAbiertasRes.data) ? cajasAbiertasRes.data : []
+            setCajasAbiertas(cajasAbiertasArray)
+
+            // Si hay una caja seleccionada, mantenerla; si no, usar la principal (más reciente)
+            if (caja && cajasAbiertasArray.find(c => c._id === caja._id)) {
+                // La caja actual sigue abierta, mantenerla
+                const cajaActualizada = cajasAbiertasArray.find(c => c._id === caja._id)
+                if (cajaActualizada) setCaja(cajaActualizada)
+            } else {
+                // Usar la caja principal (más reciente) o la primera disponible
+                setCaja(cajaRes.data || cajasAbiertasArray[0] || null)
+            }
+
+            setTurnos(turnosRes.data || [])
+            setPedidos(pedidosRes.data || [])
         } catch (error) {
             console.error('Error fetching caja:', error)
         }
     }
 
+    const fetchCajasCerradas = async () => {
+        try {
+            const res = await api.get('/caja/todas?cerradas=true')
+            setCajasCerradas(res.data || [])
+        } catch (error) {
+            console.error('Error fetching cajas cerradas:', error)
+        }
+    }
+
     useEffect(() => {
         fetchCaja()
+        fetchCajasCerradas()
 
         // Escuchar eventos de actualización de caja
         const handleCajaUpdate = () => {
             fetchCaja()
+            fetchCajasCerradas()
         }
         window.addEventListener('caja-updated', handleCajaUpdate)
 
@@ -70,6 +168,18 @@ const Caja = () => {
         }
     }, [])
 
+    const convertirFecha = (fechaStr) => {
+        if (!fechaStr) return ''
+        // Si está en formato DD/MM/YYYY, convertir a YYYY-MM-DD
+        if (fechaStr.includes('/')) {
+            const parts = fechaStr.split('/')
+            if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+                return `${parts[2]}-${parts[1]}-${parts[0]}`
+            }
+        }
+        return fechaStr
+    }
+
     const abrirCaja = async () => {
         // Validar que si se ingresa monto, sea válido (>= 0)
         if (montoInicial && parseFloat(montoInicial) < 0) {
@@ -84,17 +194,7 @@ const Caja = () => {
             }
             // Si se especificó una fecha, convertir a formato YYYY-MM-DD si es necesario
             if (fechaCaja) {
-                let fechaParaEnviar = fechaCaja
-                // Si está en formato DD/MM/YYYY, convertir a YYYY-MM-DD
-                if (fechaCaja.includes('/')) {
-                    const parts = fechaCaja.split('/')
-                    if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
-                        fechaParaEnviar = `${parts[2]}-${parts[1]}-${parts[0]}`
-                    } else {
-                        // Si no está completo, no enviar fecha
-                        fechaParaEnviar = ''
-                    }
-                }
+                const fechaParaEnviar = convertirFecha(fechaCaja)
                 if (fechaParaEnviar) {
                     payload.fecha = fechaParaEnviar
                 }
@@ -110,10 +210,61 @@ const Caja = () => {
         }
     }
 
+    const abrirOtraCaja = async () => {
+        if (!fechaCajaOtra) {
+            toastInfo('Debes seleccionar una fecha')
+            return
+        }
+        if (montoInicialOtra && parseFloat(montoInicialOtra) < 0) {
+            toastInfo('El monto inicial no puede ser negativo')
+            return
+        }
+        try {
+            const payload = { permitirMultiples: true }
+            if (montoInicialOtra && montoInicialOtra.trim() !== '') {
+                payload.montoInicial = parseFloat(montoInicialOtra) || 0
+            }
+            const fechaParaEnviar = convertirFecha(fechaCajaOtra)
+            if (fechaParaEnviar) {
+                payload.fecha = fechaParaEnviar
+            }
+            const res = await api.post('/caja/abrir', payload)
+            // Mostrar la caja que se acaba de abrir
+            setCaja(res.data)
+            setMontoInicialOtra('')
+            setFechaCajaOtra('')
+            setShowAbrirOtraCaja(false)
+            fetchCaja()
+            fetchCajasCerradas()
+            toastSuccess('Caja abierta correctamente')
+        } catch (error) {
+            const mensaje = error.response?.data?.error || error.message || 'Error al abrir la caja'
+            toastError(`Error al abrir la caja: ${mensaje}`)
+        }
+    }
+
+    const cambiarCaja = (cajaId) => {
+        const cajaSeleccionada = cajasAbiertas.find(c => c._id === cajaId)
+        if (cajaSeleccionada) {
+            setCaja(cajaSeleccionada)
+        }
+    }
+
     const cerrarCaja = async () => {
         try {
             await api.post('/caja/cerrar', { id: caja._id })
+            // Actualizar el estado de cajas abiertas inmediatamente
+            const cajasAbiertasActualizadas = cajasAbiertas.filter(c => c._id !== caja._id)
+            setCajasAbiertas(cajasAbiertasActualizadas)
+
+            // Si se cerró la caja actual, cambiar a otra caja abierta si existe
+            if (cajasAbiertasActualizadas.length > 0) {
+                setCaja(cajasAbiertasActualizadas[0]) // Cambiar a la primera caja abierta disponible
+            } else {
+                setCaja(null) // No hay más cajas abiertas
+            }
             fetchCaja()
+            fetchCajasCerradas()
             toastSuccess('Caja cerrada')
         } catch (error) {
             const errorMsg = error.response?.data?.error || error.message || 'Error al cerrar la caja'
@@ -135,7 +286,12 @@ const Caja = () => {
             const efectivo = parseFloat(egresoData.efectivo) || 0
             const transferencia = parseFloat(egresoData.transferencia) || 0
             const observaciones = egresoData.observaciones || ''
-            await api.post('/caja/egreso', { efectivo, transferencia, observaciones })
+            // Enviar la fecha de la caja actual para que el egreso se registre en la caja correcta
+            const payload = { efectivo, transferencia, observaciones }
+            if (caja && caja.fecha) {
+                payload.fecha = caja.fecha
+            }
+            await api.post('/caja/egreso', payload)
             setShowEgresoModal(false)
             setEgresoData({ efectivo: '', transferencia: '', observaciones: '' })
             fetchCaja()
@@ -213,6 +369,13 @@ const Caja = () => {
                                         setFechaCaja(formatted)
                                     }}
                                     onKeyDown={(e) => {
+                                        // Enter: enviar el formulario
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            abrirCaja()
+                                            return
+                                        }
+
                                         const nums = fechaCaja.replace(/\D/g, '')
 
                                         // Backspace: si está en posición de separador, borrar también el separador
@@ -305,37 +468,79 @@ const Caja = () => {
                 </div>
             ) : (
                 <div className="space-y-6">
-                    <div className="card bg-gradient-to-br from-green-600 to-green-800">
+                    {/* Selector de cajas abiertas si hay más de una */}
+                    {cajasAbiertas.length > 1 && (
+                        <div className="card bg-slate-800">
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Seleccionar Caja:
+                            </label>
+                            <select
+                                value={caja?._id || ''}
+                                onChange={(e) => cambiarCaja(e.target.value)}
+                                className="input-field w-full"
+                            >
+                                {cajasAbiertas.map((c) => (
+                                    <option key={c._id} value={c._id}>
+                                        {c.fecha} {c.cerrada ? '(Cerrada)' : '(Abierta)'}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <div className={`card ${caja.cerrada ? 'bg-gradient-to-br from-slate-600 to-slate-800' : 'bg-gradient-to-br from-green-600 to-green-800'}`}>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                            <h3 className="text-lg sm:text-xl font-bold text-white">Caja Abierta</h3>
-                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                                <button
-                                    onClick={() => setShowEgresoModal(true)}
-                                    className="bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all w-full sm:w-auto"
-                                >
-                                    + Egreso
-                                </button>
-                                <button onClick={handleCerrarCajaClick} className="btn-secondary w-full sm:w-auto">
-                                    Cerrar Caja
-                                </button>
-                            </div>
+                            <h3 className="text-lg sm:text-xl font-bold text-white">
+                                {caja.cerrada ? 'Caja Cerrada' : 'Caja Abierta'}
+                            </h3>
+                            {!caja.cerrada && (() => {
+                                // Solo mostrar "Abrir Caja Anterior" si:
+                                // 1. La caja actual es la de hoy
+                                // 2. Y solo hay una caja abierta (no hay otras cajas abiertas)
+                                const hoy = new Date().toISOString().split("T")[0]
+                                const esCajaDeHoy = caja.fecha === hoy
+                                const soloHayUnaCaja = cajasAbiertas.length === 1
+                                const mostrarBotonAbrirOtra = esCajaDeHoy && soloHayUnaCaja
+
+                                return (
+                                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                        {mostrarBotonAbrirOtra && (
+                                            <button
+                                                onClick={() => setShowAbrirOtraCaja(true)}
+                                                className="bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all w-full sm:w-auto"
+                                            >
+                                                Abrir Caja Anterior
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => setShowEgresoModal(true)}
+                                            className="bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all w-full sm:w-auto"
+                                        >
+                                            + Egreso
+                                        </button>
+                                        <button onClick={handleCerrarCajaClick} className="btn-secondary w-full sm:w-auto">
+                                            Cerrar Caja
+                                        </button>
+                                    </div>
+                                )
+                            })()}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <p className="text-green-200 text-sm">Monto Inicial</p>
+                                <p className={`text-sm ${caja.cerrada ? 'text-slate-200' : 'text-green-200'}`}>Monto Inicial</p>
                                 <p className="text-xl sm:text-2xl font-bold text-white">
                                     ${caja.montoInicial.toLocaleString()}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-green-200 text-sm">Fecha</p>
+                                <p className={`text-sm ${caja.cerrada ? 'text-slate-200' : 'text-green-200'}`}>Fecha</p>
                                 <p className="text-lg font-semibold text-white">{caja.fecha}</p>
                             </div>
                         </div>
                     </div>
 
                     {resumen && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div className="card bg-gradient-to-br from-blue-600 to-blue-800">
                                 <p className="text-blue-200 text-sm mb-2">Efectivo</p>
                                 <p className="text-2xl sm:text-3xl font-bold text-white">
@@ -348,12 +553,37 @@ const Caja = () => {
                                     ${resumen.totalTransferencia.toLocaleString()}
                                 </p>
                             </div>
-                            <div className="card bg-gradient-to-br from-fuxia-primary to-fuxia-dark">
-                                <p className="text-fuchsia-200 text-sm mb-2">Total</p>
+                            <div className="card bg-gradient-to-br from-red-600 to-red-800">
+                                <p className="text-red-200 text-sm mb-2">Egresos Hoy</p>
                                 <p className="text-2xl sm:text-3xl font-bold text-white">
-                                    ${resumen.total.toLocaleString()}
+                                    ${resumen.egresos.total.toLocaleString()}
+                                </p>
+                                {(resumen.egresos.total > 0) && (
+                                    <p className="text-xs text-red-100 mt-1">
+                                        Ef: ${resumen.egresos.efectivo.toLocaleString()} / Tr: ${resumen.egresos.transferencia.toLocaleString()}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="card bg-gradient-to-br from-orange-600 to-orange-800">
+                                <p className="text-orange-200 text-sm mb-2">Turnos</p>
+                                {resumen.turnos.cantidad > 0 && (
+                                    <p className="text-sm font-semibold text-orange-100 mb-1">
+                                        x{resumen.turnos.cantidad}
+                                    </p>
+                                )}
+                                <p className="text-2xl sm:text-3xl font-bold text-white">
+                                    ${resumen.turnos.total.toLocaleString()}
                                 </p>
                             </div>
+                        </div>
+                    )}
+
+                    {resumen && (
+                        <div className="card bg-gradient-to-br from-fuxia-primary to-fuxia-dark">
+                            <p className="text-fuchsia-200 text-sm mb-2">Total</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-white">
+                                ${resumen.total.toLocaleString()}
+                            </p>
                         </div>
                     )}
                 </div>
@@ -367,7 +597,7 @@ const Caja = () => {
             >
                 <div className="space-y-4">
                     <p className="text-slate-300 text-sm">
-                        Esto cerrará la caja del día. Podés volver a abrirla mañana.
+                        Esto cerrará la caja del día de la fecha.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-3">
                         <button onClick={handleConfirmCerrar} className="btn-primary w-full sm:flex-1">
@@ -440,6 +670,111 @@ const Caja = () => {
                         </button>
                         <button
                             onClick={() => setShowEgresoModal(false)}
+                            className="btn-secondary w-full sm:flex-1"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={showAbrirOtraCaja}
+                onClose={() => {
+                    setShowAbrirOtraCaja(false)
+                    setMontoInicialOtra('')
+                    setFechaCajaOtra('')
+                }}
+                title="Abrir Caja de Fecha Anterior"
+                maxWidth="max-w-md"
+            >
+                <div className="space-y-4">
+                    <p className="text-slate-300 text-sm">
+                        Puedes abrir una caja de cualquier fecha pasada. Los movimientos se registrarán en la caja correspondiente a cada fecha.
+                    </p>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Fecha (requerido)
+                        </label>
+                        <div className="relative flex gap-2">
+                            <input
+                                type="text"
+                                value={fechaCajaOtra}
+                                onChange={(e) => {
+                                    let value = e.target.value.replace(/\D/g, '')
+                                    if (value.length > 8) value = value.slice(0, 8)
+                                    let formatted = value
+                                    if (value.length > 2) {
+                                        formatted = value.slice(0, 2) + '/' + value.slice(2)
+                                    }
+                                    if (value.length > 4) {
+                                        formatted = value.slice(0, 2) + '/' + value.slice(2, 4) + '/' + value.slice(4, 8)
+                                    }
+                                    setFechaCajaOtra(formatted)
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault()
+                                        abrirOtraCaja()
+                                    }
+                                }}
+                                placeholder="DD/MM/YYYY"
+                                className="input-field flex-1"
+                                maxLength={10}
+                            />
+                            <input
+                                type="date"
+                                value={fechaCajaOtra && !fechaCajaOtra.includes('/') ? fechaCajaOtra : ''}
+                                onChange={(e) => setFechaCajaOtra(e.target.value)}
+                                className="absolute opacity-0 pointer-events-none w-0 h-0"
+                                max={new Date().toISOString().split('T')[0]}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const dateInput = document.createElement('input')
+                                    dateInput.type = 'date'
+                                    dateInput.max = new Date().toISOString().split('T')[0]
+                                    dateInput.onchange = (e) => setFechaCajaOtra(e.target.value)
+                                    dateInput.click()
+                                }}
+                                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                                title="Abrir calendario"
+                            >
+                                📅
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Monto Inicial (opcional, si no lo ingresas, mantiene el anterior)
+                        </label>
+                        <input
+                            type="number"
+                            value={montoInicialOtra}
+                            onChange={(e) => setMontoInicialOtra(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    abrirOtraCaja()
+                                }
+                            }}
+                            placeholder="0.00"
+                            className="input-field"
+                            step="0.01"
+                            min="0"
+                        />
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <button onClick={abrirOtraCaja} className="btn-primary w-full sm:flex-1">
+                            Abrir Caja
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowAbrirOtraCaja(false)
+                                setMontoInicialOtra('')
+                                setFechaCajaOtra('')
+                            }}
                             className="btn-secondary w-full sm:flex-1"
                         >
                             Cancelar

@@ -20,15 +20,24 @@ export const getEstado = asyncHandler(async (req, res) => {
 */
 export const abrirCaja = asyncHandler(async (req, res) => {
     const { Caja } = req.models
-    const { montoInicial, fecha } = req.body;
+    const { montoInicial, fecha, permitirMultiples } = req.body;
 
     // Usar la fecha proporcionada o la de hoy por defecto
     const fechaCaja = fecha || getTodayYMD();
+    const hoy = getTodayYMD();
 
-    // Verificar si ya hay una caja abierta (cualquier fecha)
-    const cajaAbiertaExistente = await Caja.findOne({ cerrada: false });
-    if (cajaAbiertaExistente) {
-        return res.status(400).json({ error: `Ya existe una caja abierta (fecha: ${cajaAbiertaExistente.fecha}). Debes cerrarla antes de abrir una nueva.` });
+    // Si no se permite múltiples cajas y ya hay una abierta, verificar
+    if (!permitirMultiples) {
+        const cajaAbiertaExistente = await Caja.findOne({ cerrada: false });
+        if (cajaAbiertaExistente) {
+            return res.status(400).json({ error: `Ya existe una caja abierta (fecha: ${cajaAbiertaExistente.fecha}). Debes cerrarla antes de abrir una nueva.` });
+        }
+    } else {
+        // Si se permite múltiples, solo verificar que no haya otra caja abierta para la misma fecha
+        const cajaAbiertaMismaFecha = await Caja.findOne({ fecha: fechaCaja, cerrada: false });
+        if (cajaAbiertaMismaFecha) {
+            return res.json(cajaAbiertaMismaFecha); // Ya existe una caja abierta para esa fecha, retornarla
+        }
     }
 
     // Buscar si ya existe una caja (abierta o cerrada) para esa fecha
@@ -114,8 +123,16 @@ export const getResumen = asyncHandler(async (req, res) => {
  */
 export const registrarEgreso = asyncHandler(async (req, res) => {
     const { Caja } = req.models
-    // Buscar cualquier caja abierta (sin importar la fecha)
-    const caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 })
+    const { fecha } = req.body // Opcional: fecha de la caja donde registrar el egreso
+
+    let caja
+    if (fecha) {
+        // Si se especifica una fecha, buscar la caja abierta de esa fecha
+        caja = await Caja.findOne({ fecha, cerrada: false }).sort({ createdAt: -1 })
+    } else {
+        // Si no se especifica, buscar la caja abierta más reciente (principal)
+        caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 })
+    }
 
     if (!caja) {
         return res.status(400).json({ error: 'No hay una caja abierta' })
@@ -137,4 +154,23 @@ export const registrarEgreso = asyncHandler(async (req, res) => {
     await caja.save()
 
     res.status(201).json(caja)
+})
+
+/**
+ * Obtener todas las cajas (con filtro opcional)
+ * GET /api/caja/todas?cerradas=true
+ */
+export const getTodasCajas = asyncHandler(async (req, res) => {
+    const { Caja } = req.models
+    const { cerradas } = req.query
+
+    let query = {}
+    if (cerradas === 'true') {
+        query.cerrada = true
+    } else if (cerradas === 'false') {
+        query.cerrada = false
+    }
+
+    const cajas = await Caja.find(query).sort({ fecha: -1, createdAt: -1 })
+    res.json(cajas)
 })

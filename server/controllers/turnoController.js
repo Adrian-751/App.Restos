@@ -130,8 +130,17 @@ export const updateTurno = asyncHandler(async (req, res) => {
         const deltaT = nextT - prevT
 
         if (deltaE !== 0 || deltaT !== 0) {
-            // Buscar cualquier caja abierta, sin importar la fecha
-            const caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 })
+            // Buscar la caja correcta según la fecha del turno
+            const fechaTurno = turno.createdAt ? new Date(turno.createdAt).toISOString().split("T")[0] : null
+            let caja = null
+            if (fechaTurno) {
+                // Buscar caja abierta de esa fecha
+                caja = await Caja.findOne({ fecha: fechaTurno, cerrada: false }).sort({ createdAt: -1 })
+            }
+            // Si no hay caja de esa fecha, buscar cualquier caja abierta (fallback)
+            if (!caja) {
+                caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 })
+            }
             if (caja) {
                 caja.totalEfectivo = (caja.totalEfectivo || 0) + deltaE
                 caja.totalTransferencia = (caja.totalTransferencia || 0) + deltaT
@@ -157,8 +166,17 @@ export const updateTurno = asyncHandler(async (req, res) => {
     if (estadoNuevo?.toLowerCase() === 'cobrado' &&
         estadoAnterior?.toLowerCase() !== 'cobrado') {
 
-        // Actualizar caja (buscar cualquier caja abierta, sin importar la fecha)
-        const caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 });
+        // Buscar la caja correcta según la fecha del turno
+        const fechaTurno = turno.createdAt ? new Date(turno.createdAt).toISOString().split("T")[0] : null
+        let caja = null
+        if (fechaTurno) {
+            // Buscar caja abierta de esa fecha
+            caja = await Caja.findOne({ fecha: fechaTurno, cerrada: false }).sort({ createdAt: -1 })
+        }
+        // Si no hay caja de esa fecha, buscar cualquier caja abierta (fallback)
+        if (!caja) {
+            caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 })
+        }
 
         if (caja) {
             const efectivo = parseFloat(req.body.efectivo) || turno.efectivo || 0;
