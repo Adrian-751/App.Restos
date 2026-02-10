@@ -7,8 +7,9 @@ import { getTodayYMD } from '../utils/date.js'
  */
 export const getEstado = asyncHandler(async (req, res) => {
     const { Caja } = req.models
-    const hoy = getTodayYMD();
-    const caja = await Caja.findOne({ fecha: hoy, cerrada: false });
+    // Buscar cualquier caja abierta (sin importar la fecha)
+    // Esto evita que se "cierre" automáticamente al cambiar la fecha
+    const caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 });
 
     res.json(caja || null);
 });
@@ -19,18 +20,45 @@ export const getEstado = asyncHandler(async (req, res) => {
 */
 export const abrirCaja = asyncHandler(async (req, res) => {
     const { Caja } = req.models
-    const { montoInicial } = req.body;
-    const hoy = getTodayYMD();
+    const { montoInicial, fecha } = req.body;
 
-    // Verificar si ya hay una caja abierta hoy
-    const cajaExistente = await Caja.findOne({ fecha: hoy, cerrada: false });
-    if (cajaExistente) {
-        return res.status(400).json({ error: 'Ya existe una caja abierta hoy' });
+    // Usar la fecha proporcionada o la de hoy por defecto
+    const fechaCaja = fecha || getTodayYMD();
+
+    // Verificar si ya hay una caja abierta (cualquier fecha)
+    const cajaAbiertaExistente = await Caja.findOne({ cerrada: false });
+    if (cajaAbiertaExistente) {
+        return res.status(400).json({ error: `Ya existe una caja abierta (fecha: ${cajaAbiertaExistente.fecha}). Debes cerrarla antes de abrir una nueva.` });
     }
 
+    // Buscar si ya existe una caja (abierta o cerrada) para esa fecha
+    const cajaExistente = await Caja.findOne({ fecha: fechaCaja }).sort({ createdAt: -1 });
+
+    if (cajaExistente) {
+        // Si existe, REABRIR la caja (mantener todos los datos existentes)
+        if (cajaExistente.cerrada) {
+            // Si estaba cerrada, reabrirla
+            cajaExistente.cerrada = false;
+            cajaExistente.cerradaAt = undefined;
+            // Solo actualizar monto inicial si se proporciona explícitamente en el body
+            // (no actualizar si es undefined o si no viene en el body)
+            if (montoInicial !== undefined && montoInicial !== null && req.body.hasOwnProperty('montoInicial')) {
+                cajaExistente.montoInicial = parseFloat(montoInicial) || 0;
+            }
+            // Si no se proporciona monto inicial, mantener el anterior
+            await cajaExistente.save();
+            return res.json(cajaExistente);
+        } else {
+            // Si ya está abierta, retornarla (sin modificar nada)
+            return res.json(cajaExistente);
+        }
+    }
+
+    // Si no existe, crear una nueva caja
+    // Si no se proporciona monto inicial, usar 0 por defecto
     const caja = await Caja.create({
-        fecha: hoy,
-        montoInicial: parseFloat(montoInicial) || 0,
+        fecha: fechaCaja,
+        montoInicial: (montoInicial !== undefined && montoInicial !== null) ? (parseFloat(montoInicial) || 0) : 0,
         ventas: [],
         egresos: [],
         totalEfectivo: 0,
@@ -86,11 +114,11 @@ export const getResumen = asyncHandler(async (req, res) => {
  */
 export const registrarEgreso = asyncHandler(async (req, res) => {
     const { Caja } = req.models
-    const hoy = getTodayYMD()
-    const caja = await Caja.findOne({ fecha: hoy, cerrada: false })
+    // Buscar cualquier caja abierta (sin importar la fecha)
+    const caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 })
 
     if (!caja) {
-        return res.status(400).json({ error: 'No hay una caja abierta hoy' })
+        return res.status(400).json({ error: 'No hay una caja abierta' })
     }
 
     const efectivo = parseFloat(req.body.efectivo) || 0

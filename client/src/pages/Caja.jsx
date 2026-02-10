@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../utils/api'
 import { toastError, toastInfo, toastSuccess } from '../utils/toast'
 import Modal from '../components/Modal'
@@ -6,7 +6,9 @@ import { useModalHotkeys } from '../hooks/useModalHotkeys'
 
 const Caja = () => {
     const [montoInicial, setMontoInicial] = useState('')
+    const [fechaCaja, setFechaCaja] = useState('') // Fecha para abrir caja (opcional)
     const [caja, setCaja] = useState(null)
+    const dateInputRef = useRef(null)
     const [showCerrarConfirm, setShowCerrarConfirm] = useState(false)
     const [showEgresoModal, setShowEgresoModal] = useState(false)
     const [egresoData, setEgresoData] = useState({
@@ -69,14 +71,39 @@ const Caja = () => {
     }, [])
 
     const abrirCaja = async () => {
-        if (!montoInicial || parseFloat(montoInicial) < 0) {
-            toastInfo('Por favor ingrese un monto inicial válido')
+        // Validar que si se ingresa monto, sea válido (>= 0)
+        if (montoInicial && parseFloat(montoInicial) < 0) {
+            toastInfo('El monto inicial no puede ser negativo')
             return
         }
         try {
-            await api.post('/caja/abrir', { montoInicial: parseFloat(montoInicial) || 0 })
+            const payload = {}
+            // Solo enviar montoInicial si se proporcionó un valor
+            if (montoInicial && montoInicial.trim() !== '') {
+                payload.montoInicial = parseFloat(montoInicial) || 0
+            }
+            // Si se especificó una fecha, convertir a formato YYYY-MM-DD si es necesario
+            if (fechaCaja) {
+                let fechaParaEnviar = fechaCaja
+                // Si está en formato DD/MM/YYYY, convertir a YYYY-MM-DD
+                if (fechaCaja.includes('/')) {
+                    const parts = fechaCaja.split('/')
+                    if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+                        fechaParaEnviar = `${parts[2]}-${parts[1]}-${parts[0]}`
+                    } else {
+                        // Si no está completo, no enviar fecha
+                        fechaParaEnviar = ''
+                    }
+                }
+                if (fechaParaEnviar) {
+                    payload.fecha = fechaParaEnviar
+                }
+            }
+            await api.post('/caja/abrir', payload)
             setMontoInicial('')
+            setFechaCaja('') // Resetear fecha
             fetchCaja()
+            toastSuccess('Caja abierta correctamente')
         } catch (error) {
             const mensaje = error.response?.data?.error || error.message || 'Error al abrir la caja'
             toastError(`Error al abrir la caja: ${mensaje}`)
@@ -139,7 +166,13 @@ const Caja = () => {
             {!caja ? (
                 <div className="card max-w-md mx-auto">
                     <h3 className="text-xl font-bold text-white mb-4">Abrir Caja</h3>
-                    <div className="space-y-4">
+                    <form
+                        className="space-y-4"
+                        onSubmit={(e) => {
+                            e.preventDefault()
+                            abrirCaja()
+                        }}
+                    >
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
                                 Monto Inicial
@@ -150,12 +183,125 @@ const Caja = () => {
                                 onChange={(e) => setMontoInicial(e.target.value)}
                                 placeholder="0.00"
                                 className="input-field"
+                                step="0.01"
+                                min="0"
                             />
                         </div>
-                        <button onClick={abrirCaja} className="btn-primary w-full">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Fecha (opcional - por defecto hoy)
+                            </label>
+                            <div className="relative flex gap-2">
+                                <input
+                                    type="text"
+                                    value={fechaCaja}
+                                    onChange={(e) => {
+                                        let value = e.target.value.replace(/\D/g, '') // Solo números
+                                        
+                                        // Limitar a 8 dígitos (DDMMYYYY)
+                                        if (value.length > 8) value = value.slice(0, 8)
+                                        
+                                        // Formatear como DD/MM/YYYY
+                                        let formatted = value
+                                        if (value.length > 2) {
+                                            formatted = value.slice(0, 2) + '/' + value.slice(2)
+                                        }
+                                        if (value.length > 4) {
+                                            formatted = value.slice(0, 2) + '/' + value.slice(2, 4) + '/' + value.slice(4, 8)
+                                        }
+                                        
+                                        setFechaCaja(formatted)
+                                    }}
+                                    onKeyDown={(e) => {
+                                        const nums = fechaCaja.replace(/\D/g, '')
+                                        
+                                        // Backspace: si está en posición de separador, borrar también el separador
+                                        if (e.key === 'Backspace' && (fechaCaja.endsWith('/') || fechaCaja.length === 3 || fechaCaja.length === 6)) {
+                                            e.preventDefault()
+                                            const newNums = nums.slice(0, -1)
+                                            let formatted = newNums
+                                            if (newNums.length > 2) formatted = newNums.slice(0, 2) + '/' + newNums.slice(2)
+                                            if (newNums.length > 4) formatted = newNums.slice(0, 2) + '/' + newNums.slice(2, 4) + '/' + newNums.slice(4)
+                                            setFechaCaja(formatted)
+                                        }
+                                        
+                                        // Al escribir números, avanzar automáticamente después de 2 y 4 dígitos
+                                        if (e.key >= '0' && e.key <= '9' && nums.length < 8) {
+                                            setTimeout(() => {
+                                                const currentNums = fechaCaja.replace(/\D/g, '')
+                                                if (currentNums.length === 2 && !fechaCaja.includes('/')) {
+                                                    setFechaCaja(prev => prev + '/')
+                                                } else if (currentNums.length === 4 && fechaCaja.split('/').length === 2) {
+                                                    setFechaCaja(prev => prev + '/')
+                                                }
+                                            }, 0)
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        // Convertir DD/MM/YYYY a YYYY-MM-DD para el backend
+                                        const parts = fechaCaja.split('/')
+                                        if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+                                            const day = parseInt(parts[0], 10)
+                                            const month = parseInt(parts[1], 10)
+                                            const year = parseInt(parts[2], 10)
+                                            
+                                            // Validar rangos
+                                            if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+                                                const date = new Date(year, month - 1, day)
+                                                if (date.getDate() === day && date.getMonth() === month - 1) {
+                                                    const maxDate = new Date()
+                                                    maxDate.setHours(23, 59, 59, 999)
+                                                    if (date <= maxDate) {
+                                                        setFechaCaja(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
+                                                        return
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        // Si no es válido o está incompleto, limpiar
+                                        if (fechaCaja && fechaCaja.length < 10) {
+                                            setFechaCaja('')
+                                        }
+                                    }}
+                                    placeholder="DD/MM/YYYY"
+                                    className="input-field flex-1"
+                                    maxLength={10}
+                                />
+                                <input
+                                    ref={dateInputRef}
+                                    type="date"
+                                    value={fechaCaja && !fechaCaja.includes('/') ? fechaCaja : ''}
+                                    onChange={(e) => setFechaCaja(e.target.value)}
+                                    className="absolute opacity-0 pointer-events-none w-0 h-0"
+                                    max={new Date().toISOString().split('T')[0]}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (dateInputRef.current) {
+                                            // Intentar usar showPicker (navegadores modernos)
+                                            if (dateInputRef.current.showPicker) {
+                                                dateInputRef.current.showPicker()
+                                            } else {
+                                                // Fallback: hacer click en el input
+                                                dateInputRef.current.click()
+                                            }
+                                        }
+                                    }}
+                                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center justify-center"
+                                    title="Abrir calendario"
+                                >
+                                    📅
+                                </button>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">
+                                Dejar vacío para usar la fecha de hoy. Puedes seleccionar una fecha anterior para abrir cajas retroactivas.
+                            </p>
+                        </div>
+                        <button type="submit" className="btn-primary w-full">
                             Abrir Caja
                         </button>
-                    </div>
+                    </form>
                 </div>
             ) : (
                 <div className="space-y-6">
@@ -197,7 +343,7 @@ const Caja = () => {
                                 </p>
                             </div>
                             <div className="card bg-gradient-to-br from-purple-600 to-purple-800">
-                                <p className="text-purple-200 text-sm mb-2">Transferencia</p>
+                                <p className="text-purple-200 text-sm mb-2">Transferencias</p>
                                 <p className="text-2xl sm:text-3xl font-bold text-white">
                                     ${resumen.totalTransferencia.toLocaleString()}
                                 </p>
@@ -216,7 +362,7 @@ const Caja = () => {
             <Modal
                 isOpen={showCerrarConfirm}
                 onClose={() => setShowCerrarConfirm(false)}
-                title="¿Seguro que querés cerrar la caja?"
+                title="¿Seguro que quieres cerrar la caja?"
                 maxWidth="max-w-sm"
             >
                 <div className="space-y-4">

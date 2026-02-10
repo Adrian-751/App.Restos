@@ -81,8 +81,8 @@ export const updatePedido = asyncHandler(async (req, res) => {
         const deltaT = nextT - prevT
 
         if (deltaE !== 0 || deltaT !== 0) {
-            const hoy = getTodayYMD()
-            const caja = await Caja.findOne({ fecha: hoy, cerrada: false })
+            // Buscar cualquier caja abierta, sin importar la fecha
+            const caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 })
             if (caja) {
                 caja.totalEfectivo = (caja.totalEfectivo || 0) + deltaE
                 caja.totalTransferencia = (caja.totalTransferencia || 0) + deltaT
@@ -158,9 +158,8 @@ export const updatePedido = asyncHandler(async (req, res) => {
     if (estadoNuevo?.toLowerCase() === 'cobrado' &&
         estadoAnterior?.toLowerCase() !== 'cobrado') {
 
-        // Actualizar caja
-        const hoy = getTodayYMD();
-        const caja = await Caja.findOne({ fecha: hoy, cerrada: false });
+        // Actualizar caja (buscar cualquier caja abierta, sin importar la fecha)
+        const caja = await Caja.findOne({ cerrada: false }).sort({ createdAt: -1 });
 
         if (caja) {
             const efectivo = parseFloat(req.body.efectivo) || 0;
