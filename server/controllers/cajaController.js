@@ -84,7 +84,7 @@ export const abrirCaja = asyncHandler(async (req, res) => {
 * POST /api/caja/cerrar
 */
 export const cerrarCaja = asyncHandler(async (req, res) => {
-    const { Caja } = req.models
+    const { Caja, Mesa, Pedido } = req.models
     const { id } = req.body;
     const caja = await Caja.findById(id);
 
@@ -101,6 +101,21 @@ export const cerrarCaja = asyncHandler(async (req, res) => {
     caja.totalDia = (caja.totalEfectivo || 0) + (caja.totalTransferencia || 0);
 
     await caja.save();
+
+    // Reset del "nombre" de las mesas solo si se está cerrando la caja del día actual (hoy)
+    // Esto evita que se borren los nombres si el cliente está trabajando después de medianoche
+    const hoy = getTodayYMD()
+    if (caja.fecha === hoy) {
+        // NO borrar nombre si hay pedidos sin cobrar asociados a la mesa
+        const mesasConPedidosAbiertos = await Pedido.distinct('mesaId', {
+            mesaId: { $ne: null },
+            estado: { $nin: ['Cobrado', 'Cancelado'] }
+        })
+        await Mesa.updateMany(
+            { _id: { $nin: mesasConPedidosAbiertos } },
+            { $set: { nombre: '' } }
+        )
+    }
 
     res.json(caja);
 });

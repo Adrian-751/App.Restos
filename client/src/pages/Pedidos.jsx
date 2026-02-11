@@ -28,6 +28,7 @@ const Pedidos = () => {
         transferencia: 0,
         observaciones: '',
     })
+    const [observacionesOriginales, setObservacionesOriginales] = useState('')
 
     useLockBodyScroll(!!showModal || !!showCobroModal)
 
@@ -352,11 +353,14 @@ const Pedidos = () => {
     const cobrarPedido = (pedido) => {
         // Guardar el pedido que vamos a cobrar
         setPedidoACobrar(pedido)
-        // Inicializar los datos de cobro limpios para ingresar el nuevo pago
+        // Guardar las observaciones originales para comparar después
+        const obsOriginales = pedido.observaciones || ''
+        setObservacionesOriginales(obsOriginales)
+        // Inicializar los datos de cobro, pero mantener las observaciones anteriores
         setCobroData({
             efectivo: 0,
             transferencia: 0,
-            observaciones: '',
+            observaciones: obsOriginales, // Mantener observaciones anteriores
         })
         // Abrir el modal de cobro
         setShowCobroModal(true)
@@ -377,12 +381,38 @@ const Pedidos = () => {
         // Solo se marca como "Cobrado" si el pago es completo
         const estadoFinal = totalPagado === totalPedido ? 'Cobrado' : (pedidoACobrar.estado || 'Pendiente')
 
+        // Manejar observaciones: solo agregar si el usuario escribió algo nuevo
+        const obsOriginales = observacionesOriginales || ''
+        const obsEnInput = cobroData.observaciones || ''
+
+        let observacionesFinales = obsOriginales
+
+        // Solo actualizar si el usuario escribió algo diferente a lo que ya había
+        if (obsEnInput.trim() && obsEnInput.trim() !== obsOriginales.trim()) {
+            // Si las observaciones en el input son más largas que las originales, significa que agregó algo
+            if (obsEnInput.trim().length > obsOriginales.trim().length) {
+                // Si las originales están al inicio del input, solo agregar la parte nueva
+                if (obsOriginales.trim() && obsEnInput.trim().startsWith(obsOriginales.trim())) {
+                    const parteNueva = obsEnInput.trim().substring(obsOriginales.trim().length).trim()
+                    if (parteNueva) {
+                        observacionesFinales = obsOriginales + '\n' + parteNueva
+                    }
+                } else {
+                    // Si son completamente diferentes, usar las del input
+                    observacionesFinales = obsEnInput.trim()
+                }
+            } else {
+                // Si son diferentes pero no más largas, usar las del input (el usuario las editó)
+                observacionesFinales = obsEnInput.trim()
+            }
+        }
+
         const pedidoActualizado = {
             ...pedidoACobrar,
             estado: estadoFinal,
             efectivo: efectivoExistente + nuevoEfectivo,
             transferencia: transferenciaExistente + nuevaTransferencia,
-            observaciones: cobroData.observaciones || pedidoACobrar.observaciones,
+            observaciones: observacionesFinales,
             total: totalPedido
         }
 
@@ -391,6 +421,7 @@ const Pedidos = () => {
             setShowCobroModal(false)
             setPedidoACobrar(null)
             setCobroData({ efectivo: 0, transferencia: 0, observaciones: '' })
+            setObservacionesOriginales('')
             fetchPedidos()
             window.dispatchEvent(new Event('caja-updated'))
             if (estadoFinal === 'Cobrado') {
@@ -425,7 +456,11 @@ const Pedidos = () => {
     })
     useModalHotkeys({
         isOpen: showCobroModal,
-        onCancel: () => { setShowCobroModal(false); setPedidoACobrar(null) },
+        onCancel: () => {
+            setShowCobroModal(false)
+            setPedidoACobrar(null)
+            setObservacionesOriginales('')
+        },
         onConfirm: confirmarCobro,
     })
 
@@ -495,7 +530,20 @@ const Pedidos = () => {
                             ))}
                         </div>
 
-                        <div className="border-t border-slate-700 pt-4 space-y-2">
+                        {/* Observaciones entre dos líneas separadoras */}
+                        {pedido.observaciones && (
+                            <>
+                                <div className="border-t border-slate-700 pt-4 mb-4">
+                                    <p className="text-sm text-slate-300">
+                                        <span className="text-xs text-slate-400">Observaciones: </span>
+                                        {pedido.observaciones}
+                                    </p>
+                                </div>
+                                <div className="border-t border-slate-700 pt-4"></div>
+                            </>
+                        )}
+
+                        <div className={`${pedido.observaciones ? '' : 'border-t border-slate-700 pt-4'} space-y-2`}>
                             <div className="flex justify-between text-lg font-bold text-white">
                                 <span>Total:</span>
                                 <span>${pedido.total?.toLocaleString()}</span>
@@ -747,10 +795,23 @@ const Pedidos = () => {
                     <div className="card bg-slate-800 max-w-md w-full max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold text-white mb-4">
                             Cobrar Pedido - {(() => {
-                                const mesa = mesas.find((m) => m._id === pedidoACobrar.mesaId)
-                                return mesa
-                                    ? `Mesa ${mesa.numero}${mesa.nombre ? ` - ${mesa.nombre}` : ''}`
-                                    : 'Mesa N/A'
+                                // Si tiene mesa, mostrar la mesa
+                                if (pedidoACobrar.mesaId) {
+                                    const mesa = typeof pedidoACobrar.mesaId === 'object' && pedidoACobrar.mesaId !== null
+                                        ? pedidoACobrar.mesaId
+                                        : mesas.find((m) => m._id === pedidoACobrar.mesaId || m._id === String(pedidoACobrar.mesaId))
+                                    if (mesa) {
+                                        const numero = typeof mesa === 'object' ? mesa.numero : mesa.numero
+                                        const nombreMesa = typeof mesa === 'object' ? mesa.nombre : mesa.nombre
+                                        return `Mesa ${numero}${nombreMesa ? ` - ${nombreMesa}` : ''}`
+                                    }
+                                }
+                                // Si no tiene mesa pero tiene nombre, mostrar el nombre
+                                if (pedidoACobrar.nombre) {
+                                    return pedidoACobrar.nombre
+                                }
+                                // Si no tiene ni mesa ni nombre
+                                return 'Mesa N/A'
                             })()}
                         </h3>
 
@@ -849,7 +910,7 @@ const Pedidos = () => {
 
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                                    Observaciones de Transferencia
+                                    Observaciones
                                 </label>
                                 <textarea
                                     value={cobroData.observaciones}
@@ -870,6 +931,7 @@ const Pedidos = () => {
                                         setShowCobroModal(false)
                                         setPedidoACobrar(null)
                                         setCobroData({ efectivo: 0, transferencia: 0, observaciones: '' })
+                                        setObservacionesOriginales('')
                                     }}
                                     className="btn-secondary w-full sm:flex-1"
                                 >
