@@ -68,10 +68,14 @@ const Pedidos = () => {
         try {
             const res = await api.get('/pedidos')
             // Obtener la fecha de la caja seleccionada desde localStorage
-            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
-
-            // Verificar si la fecha seleccionada es de hoy
+            let fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
             const fechaHoy = new Date().toISOString().split("T")[0]
+
+            // Si la fecha guardada es de hoy o no existe, limpiarla para mostrar todos los pedidos de hoy
+            if (!fechaCajaSeleccionada || fechaCajaSeleccionada === fechaHoy) {
+                fechaCajaSeleccionada = null
+            }
+
             const esCajaDeHoy = fechaCajaSeleccionada === fechaHoy
 
             // Mostrar todos los pedidos NO cobrados (incluye cuenta corriente / pagos parciales)
@@ -79,10 +83,11 @@ const Pedidos = () => {
             // Solo filtrar por fecha si la caja seleccionada es de un día anterior
             const pedidosFiltrados = res.data.filter((p) => {
                 const est = String(p?.estado || '').toLowerCase()
+                // Excluir solo los cobrados y cancelados
                 if (est === 'cobrado' || est === 'cancelado') return false
 
-                // Si la caja seleccionada es de hoy o no hay fecha seleccionada, mostrar todos los pedidos pendientes
-                if (esCajaDeHoy || !fechaCajaSeleccionada) {
+                // Si NO hay fecha seleccionada O la fecha seleccionada es de hoy, mostrar TODOS los pedidos pendientes
+                if (!fechaCajaSeleccionada || esCajaDeHoy) {
                     return true
                 }
 
@@ -98,6 +103,17 @@ const Pedidos = () => {
             setPedidos(pedidosFiltrados)
         } catch (error) {
             console.error('Error fetching pedidos:', error)
+            // En caso de error, intentar mostrar todos los pedidos pendientes
+            try {
+                const res = await api.get('/pedidos')
+                const todosPendientes = res.data.filter((p) => {
+                    const est = String(p?.estado || '').toLowerCase()
+                    return est !== 'cobrado' && est !== 'cancelado'
+                })
+                setPedidos(todosPendientes)
+            } catch (err) {
+                console.error('Error en fallback:', err)
+            }
         }
     }
 
