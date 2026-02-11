@@ -251,7 +251,8 @@ const Caja = () => {
             }
             setMontoInicial('')
             setFechaCaja('') // Resetear fecha
-            fetchCaja()
+            // Actualizar cajas abiertas y la caja actual
+            await fetchCaja()
             toastSuccess('Caja abierta correctamente')
         } catch (error) {
             const mensaje = error.response?.data?.error || error.message || 'Error al abrir la caja'
@@ -555,37 +556,39 @@ const Caja = () => {
                             <h3 className="text-lg sm:text-xl font-bold text-white">
                                 {caja.cerrada ? 'Caja Cerrada' : 'Caja Abierta'}
                             </h3>
-                            {!caja.cerrada && (() => {
-                                // Solo mostrar "Abrir Caja Anterior" si:
-                                // 1. La caja actual es la de hoy
-                                // 2. Y solo hay una caja abierta (no hay otras cajas abiertas)
-                                const hoy = new Date().toISOString().split("T")[0]
-                                const esCajaDeHoy = caja.fecha === hoy
-                                const soloHayUnaCaja = cajasAbiertas.length === 1
-                                const mostrarBotonAbrirOtra = esCajaDeHoy && soloHayUnaCaja
-
-                                return (
-                                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                                        {mostrarBotonAbrirOtra && (
+                            {!caja.cerrada && (
+                                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                    {(() => {
+                                        // Mostrar "Abrir Caja Anterior" si la caja actual es de hoy
+                                        const hoy = new Date().toISOString().split("T")[0]
+                                        const esCajaDeHoy = caja?.fecha === hoy
+                                        
+                                        return esCajaDeHoy ? (
                                             <button
+                                                type="button"
                                                 onClick={() => setShowAbrirOtraCaja(true)}
                                                 className="bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all w-full sm:w-auto"
                                             >
                                                 Abrir Caja Anterior
                                             </button>
-                                        )}
-                                        <button
-                                            onClick={() => setShowEgresoModal(true)}
-                                            className="bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all w-full sm:w-auto"
-                                        >
-                                            + Egreso
-                                        </button>
-                                        <button onClick={handleCerrarCajaClick} className="btn-secondary w-full sm:w-auto">
-                                            Cerrar Caja
-                                        </button>
-                                    </div>
-                                )
-                            })()}
+                                        ) : null
+                                    })()}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowEgresoModal(true)}
+                                        className="bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all w-full sm:w-auto"
+                                    >
+                                        + Egreso
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={handleCerrarCajaClick} 
+                                        className="btn-secondary w-full sm:w-auto"
+                                    >
+                                        Cerrar Caja
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
