@@ -381,14 +381,16 @@ const Pedidos = () => {
         // Solo se marca como "Cobrado" si el pago es completo
         const estadoFinal = totalPagado === totalPedido ? 'Cobrado' : (pedidoACobrar.estado || 'Pendiente')
 
-        // Manejar observaciones: solo agregar si el usuario escribió algo nuevo
+        // Manejar observaciones
         const obsOriginales = observacionesOriginales || ''
         const obsEnInput = cobroData.observaciones || ''
 
         let observacionesFinales = obsOriginales
 
-        // Solo actualizar si el usuario escribió algo diferente a lo que ya había
-        if (obsEnInput.trim() && obsEnInput.trim() !== obsOriginales.trim()) {
+        // Si el usuario borró todo, eliminar las observaciones
+        if (!obsEnInput.trim()) {
+            observacionesFinales = ''
+        } else if (obsEnInput.trim() !== obsOriginales.trim()) {
             // Si las observaciones en el input son más largas que las originales, significa que agregó algo
             if (obsEnInput.trim().length > obsOriginales.trim().length) {
                 // Si las originales están al inicio del input, solo agregar la parte nueva
