@@ -1,0 +1,49 @@
+===========================================
+COMANDOS URGENTES PARA MONGODB ATLAS
+===========================================
+
+PASO 1: Ver todos los pedidos pendientes
+------------------------------------------
+db.pedidos.find({
+  estado: { $nin: ['Cobrado', 'cobrado', 'Cancelado', 'cancelado'] }
+}).sort({ createdAt: -1 }).limit(20).pretty()
+
+
+PASO 2: Ver pedidos de HOY
+------------------------------------------
+db.pedidos.find({
+  estado: { $nin: ['Cobrado', 'cobrado', 'Cancelado', 'cancelado'] },
+  createdAt: {
+    $gte: new Date(new Date().setHours(0,0,0,0)),
+    $lt: new Date(new Date().setHours(23,59,59,999))
+  }
+}).pretty()
+
+
+PASO 3: CORREGIR estados (solo si es necesario)
+------------------------------------------
+db.pedidos.updateMany(
+  {
+    estado: { $nin: ['Cobrado', 'cobrado', 'Cancelado', 'cancelado'] }
+  },
+  {
+    $set: { estado: 'Pendiente' }
+  }
+)
+
+
+PASO 4: Verificar que funcionó
+------------------------------------------
+db.pedidos.find({
+  estado: 'Pendiente'
+}).sort({ createdAt: -1 }).limit(10).pretty()
+
+===========================================
+INSTRUCCIONES:
+1. Ve a https://cloud.mongodb.com
+2. Selecciona tu cluster
+3. Click en "Browse Collections"
+4. Selecciona tu base de datos
+5. Busca el botón "MongoSH" o "Shell" (ícono de terminal)
+6. Pega y ejecuta los comandos uno por uno
+===========================================
