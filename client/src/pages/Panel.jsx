@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../utils/api'
+import { getYMDArgentina } from '../utils/date'
 
 const Panel = () => {
     const [stats, setStats] = useState(null)
@@ -16,7 +17,7 @@ const Panel = () => {
             ])
 
             //Buscar la caja del dia (abierta o cerrada)
-            const hoy = new Date().toISOString().split("T")[0];
+            const hoy = getYMDArgentina(new Date());
             const cajasHoyArray = Array.isArray(cajasHoy.data) ? cajasHoy.data : []
             const cajaHoy = caja.data || cajasHoyArray.find(c => c.fecha === hoy);
 
@@ -41,7 +42,7 @@ const Panel = () => {
             const turnosArray = Array.isArray(turnos.data) ? turnos.data : []
             const turnosHoy = turnosArray.filter((t) => {
                 if (!t || !t.createdAt) return false
-                const fechaTurno = new Date(t.createdAt).toISOString().split("T")[0];
+                const fechaTurno = getYMDArgentina(t.createdAt);
                 return fechaTurno === hoy && t.estado?.toLowerCase() === 'cobrado';
             });
             const cantidadTurnosDesdeTurnos = turnosHoy.length;
@@ -62,7 +63,7 @@ const Panel = () => {
             const TURNO_PRODUCTO_NOMBRE = 'turno futbol'
             const pedidosCobradosHoy = pedidosArray.filter((p) => {
                 if (!p || !p.createdAt) return false
-                const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                const fechaPedido = getYMDArgentina(p.createdAt)
                 return fechaPedido === hoy && String(p.estado || '').toLowerCase() === 'cobrado'
             })
 

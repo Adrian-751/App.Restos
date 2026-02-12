@@ -4,6 +4,7 @@ import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
 import { toastError, toastInfo, toastSuccess } from '../utils/toast'
 import { useModalHotkeys } from '../hooks/useModalHotkeys'
 import ProductCombobox from '../components/ProductCombobox'
+import { getYMDArgentina, moneyToCents } from '../utils/date'
 
 const Pedidos = () => {
     const [pedidos, setPedidos] = useState([])
@@ -67,7 +68,7 @@ const Pedidos = () => {
     const fetchPedidos = async () => {
         try {
             const res = await api.get('/pedidos')
-            const fechaHoy = new Date().toISOString().split("T")[0]
+            const fechaHoy = getYMDArgentina(new Date())
             
             // Obtener la fecha de la caja seleccionada desde localStorage
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
@@ -85,7 +86,7 @@ const Pedidos = () => {
 
                 // Filtrar por fecha de la caja seleccionada
                 if (p.createdAt) {
-                    const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                    const fechaPedido = getYMDArgentina(p.createdAt)
                     return fechaPedido === fechaFiltro
                 }
 
@@ -206,13 +207,13 @@ const Pedidos = () => {
         if (!producto) return
 
         const precio = precioPersonalizado
-            ? parseFloat(precioPersonalizado)
-            : producto.precio
+            ? (parseFloat(precioPersonalizado) || 0)
+            : (parseFloat(producto.precio) || 0)
 
         const newItem = {
             productoId: producto._id,
             nombre: producto.nombre,
-            cantidad: parseInt(cantidad),
+            cantidad: parseInt(cantidad, 10) || 1,
             precio: precio,
             precioOriginal: producto.precio,
         }
@@ -248,7 +249,7 @@ const Pedidos = () => {
     const updateItemQuantity = (index, newCantidad) => {
         if (newCantidad < 1) return
         const updatedItems = formData.items.map((item, i) =>
-            i === index ? { ...item, cantidad: parseInt(newCantidad) } : item
+            i === index ? { ...item, cantidad: parseInt(newCantidad, 10) || 1 } : item
         )
         setFormData({
             ...formData,
@@ -257,7 +258,11 @@ const Pedidos = () => {
     }
 
     const calcularTotal = () => {
-        return formData.items.reduce((sum, item) => sum + item.precio * item.cantidad, 0)
+        return formData.items.reduce((sum, item) => {
+            const precio = Number(item?.precio || 0)
+            const cant = Number(item?.cantidad || 0)
+            return sum + (precio * cant)
+        }, 0)
     }
 
     const calcularRestante = () => {
@@ -308,7 +313,7 @@ const Pedidos = () => {
 
                         // Si hay una fecha de caja seleccionada, filtrar por esa fecha
                         if (fechaCajaSeleccionada && p.createdAt) {
-                            const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                            const fechaPedido = getYMDArgentina(p.createdAt)
                             if (fechaPedido !== fechaCajaSeleccionada) return false
                         }
 
@@ -398,7 +403,9 @@ const Pedidos = () => {
         const totalPedido = parseFloat(pedidoACobrar.total) || 0
 
         // Solo se marca como "Cobrado" si el pago es completo
-        const estadoFinal = totalPagado === totalPedido ? 'Cobrado' : (pedidoACobrar.estado || 'Pendiente')
+        const estadoFinal = moneyToCents(totalPagado) >= moneyToCents(totalPedido)
+            ? 'Cobrado'
+            : (pedidoACobrar.estado || 'Pendiente')
 
         // Manejar observaciones
         const obsOriginales = observacionesOriginales || ''
@@ -448,7 +455,7 @@ const Pedidos = () => {
             if (estadoFinal === 'Cobrado') {
                 toastSuccess('Pedido cobrado. Caja actualizada.')
             } else {
-                const restante = totalPedido - totalPagado
+                const restante = (moneyToCents(totalPedido) - moneyToCents(totalPagado)) / 100
                 toastInfo(`Pago registrado. Restante: $${restante.toLocaleString()}`)
             }
         } catch (error) {
@@ -594,7 +601,7 @@ const Pedidos = () => {
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-2 mt-4">
-                            {pedido.estado !== 'cobrado' && (
+                            {String(pedido.estado || '').toLowerCase() !== 'cobrado' && (
                                 <>
                                     <button
                                         onClick={() => openEditModal(pedido)}

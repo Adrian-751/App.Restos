@@ -1,5 +1,5 @@
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { getTodayYMD } from '../utils/date.js'
+import { formatDateYMD } from '../utils/date.js'
 
 
 /* Obtener todos los pedidos
@@ -20,8 +20,9 @@ export const getPedidos = asyncHandler(async (req, res) => {
  * POST /api/pedidos
  */
 export const createPedido = asyncHandler(async (req, res) => {
-    const { Pedido, Cliente, Mesa } = req.models
+    const { Pedido, Cliente } = req.models
     const { nombre, mesaId, clienteId, items, total, observaciones, fecha } = req.body;
+    const totalNum = parseFloat(total) || 0
 
     // Determinar estado inicial
     let estado = 'Pendiente';
@@ -31,25 +32,19 @@ export const createPedido = asyncHandler(async (req, res) => {
         // Actualizar cuenta corriente del cliente
         const cliente = await Cliente.findById(clienteId);
         if (cliente) {
-            cliente.cuentaCorriente = (cliente.cuentaCorriente || 0) + (total || 0);
+            cliente.cuentaCorriente = (parseFloat(cliente.cuentaCorriente) || 0) + totalNum;
             await cliente.save();
-        }
-    }
-
-    // Obtener el nombre de la mesa si hay mesaId
-    let mesaNombre = ''
-    if (mesaId) {
-        const mesa = await Mesa.findById(mesaId)
-        if (mesa) {
-            mesaNombre = mesa.nombre || ''
         }
     }
 
     // Si se proporciona una fecha, convertirla a Date para createdAt
     let createdAt = undefined
     if (fecha) {
-        // La fecha viene en formato YYYY-MM-DD, convertir a Date
-        const fechaDate = new Date(fecha + 'T12:00:00') // Usar mediodía para evitar problemas de timezone
+        // La fecha viene en formato YYYY-MM-DD. Mantener esa fecha, pero conservar la hora actual local
+        // (evita que en Histórico aparezcan siempre 12:00).
+        const now = new Date()
+        const hhmmss = now.toTimeString().slice(0, 8)
+        const fechaDate = new Date(`${fecha}T${hhmmss}`)
         if (!isNaN(fechaDate.getTime())) {
             createdAt = fechaDate
         }
@@ -58,10 +53,9 @@ export const createPedido = asyncHandler(async (req, res) => {
     const pedidoData = {
         nombre: (nombre ?? '').toString(),
         mesaId: mesaId || null,
-        mesaNombre: mesaNombre,
         clienteId: clienteId || null,
         items: items || [],
-        total: total || 0,
+        total: totalNum,
         efectivo: 0,
         transferencia: 0,
         observaciones: observaciones || '',
@@ -84,7 +78,7 @@ export const createPedido = asyncHandler(async (req, res) => {
  * PUT /api/pedidos/:id
  */
 export const updatePedido = asyncHandler(async (req, res) => {
-    const { Pedido, Cliente, Caja, Mesa } = req.models
+    const { Pedido, Cliente, Caja } = req.models
     const pedido = await Pedido.findById(req.params.id);
 
     if (!pedido) {
@@ -98,72 +92,28 @@ export const updatePedido = asyncHandler(async (req, res) => {
     if (req.body.mesaId === '') req.body.mesaId = null
     if (req.body.clienteId === '') req.body.clienteId = null
 
-    // Actualizar el nombre de la mesa si se cambia la mesa o si se actualiza el pedido
-    if (req.body.mesaId !== undefined) {
-        const nuevaMesaId = req.body.mesaId || null
-        if (nuevaMesaId) {
-            const mesa = await Mesa.findById(nuevaMesaId)
-            if (mesa) {
-                req.body.mesaNombre = mesa.nombre || ''
-            } else {
-                req.body.mesaNombre = ''
-            }
-        } else {
-            req.body.mesaNombre = ''
-        }
-    }
-
     // 1) Caja: sumar pagos parciales (delta efectivo/transferencia) aunque NO esté Cobrado
     // Esto permite que Caja/Gestión/Métricas reflejen ingresos en tiempo real.
     {
         const prevE = parseFloat(pedido.efectivo) || 0
         const prevT = parseFloat(pedido.transferencia) || 0
-        const prevTotal = parseFloat(pedido.total) || 0
         const nextE = req.body.efectivo != null ? (parseFloat(req.body.efectivo) || 0) : prevE
         const nextT = req.body.transferencia != null ? (parseFloat(req.body.transferencia) || 0) : prevT
-        const nextTotal = req.body.total != null ? (parseFloat(req.body.total) || 0) : prevTotal
         const deltaE = nextE - prevE
         const deltaT = nextT - prevT
 
-        // Si el total cambió y hay pagos parciales, ajustar los pagos si exceden el nuevo total
-        let ajusteE = deltaE
-        let ajusteT = deltaT
-        if (nextTotal !== prevTotal && (nextE > 0 || nextT > 0)) {
-            const totalPagado = nextE + nextT
-            if (totalPagado > nextTotal) {
-                // Los pagos exceden el nuevo total, ajustar proporcionalmente
-                const ratio = nextTotal / totalPagado
-                const nuevoE = nextE * ratio
-                const nuevoT = nextT * ratio
-                ajusteE = nuevoE - prevE
-                ajusteT = nuevoT - prevT
-                // Actualizar los valores en req.body para que se guarden correctamente
-                req.body.efectivo = nuevoE
-                req.body.transferencia = nuevoT
-            }
-        }
-
-        if (ajusteE !== 0 || ajusteT !== 0) {
-            // Buscar la caja correcta según el rango de tiempo (desde createdAt hasta cerradaAt o ahora)
-            const fechaPedido = pedido.createdAt ? new Date(pedido.createdAt) : null
+        if (deltaE !== 0 || deltaT !== 0) {
+            // Buscar la caja correcta según la fecha del pedido
+            const fechaPedido = formatDateYMD(pedido.createdAt)
             let caja = null
             if (fechaPedido) {
-                // Buscar todas las cajas abiertas y encontrar la que contiene esta fecha en su rango
-                const cajasAbiertas = await Caja.find({ cerrada: false }).sort({ createdAt: -1 })
-                const ahora = new Date()
-                for (const c of cajasAbiertas) {
-                    const inicioCaja = c.createdAt ? new Date(c.createdAt) : new Date(c.fecha + 'T00:00:00')
-                    const finCaja = c.cerradaAt ? new Date(c.cerradaAt) : ahora
-                    if (fechaPedido >= inicioCaja && fechaPedido <= finCaja) {
-                        caja = c
-                        break
-                    }
-                }
+                // Buscar SOLO caja abierta de esa fecha específica (no hacer fallback a otras fechas)
+                caja = await Caja.findOne({ fecha: fechaPedido, cerrada: false }).sort({ createdAt: -1 })
             }
-            // Solo registrar si encontramos la caja correcta
+            // Solo registrar si encontramos la caja de esa fecha específica
             if (caja) {
-                caja.totalEfectivo = (caja.totalEfectivo || 0) + ajusteE
-                caja.totalTransferencia = (caja.totalTransferencia || 0) + ajusteT
+                caja.totalEfectivo = (caja.totalEfectivo || 0) + deltaE
+                caja.totalTransferencia = (caja.totalTransferencia || 0) + deltaT
                 if (caja.totalEfectivo < 0) caja.totalEfectivo = 0
                 if (caja.totalTransferencia < 0) caja.totalTransferencia = 0
 
@@ -171,9 +121,9 @@ export const updatePedido = asyncHandler(async (req, res) => {
                 caja.ventas.push({
                     pedidoId: pedido._id.toString(),
                     tipo: 'pedido',
-                    total: (ajusteE + ajusteT),
-                    efectivo: ajusteE,
-                    transferencia: ajusteT,
+                    total: (deltaE + deltaT),
+                    efectivo: deltaE,
+                    transferencia: deltaT,
                     fecha: new Date()
                 })
 
@@ -232,27 +182,18 @@ export const updatePedido = asyncHandler(async (req, res) => {
         }
     }
 
-        // Si cambió a "Cobrado"
-        if (estadoNuevo?.toLowerCase() === 'cobrado' &&
-            estadoAnterior?.toLowerCase() !== 'cobrado') {
+    // Si cambió a "Cobrado"
+    if (estadoNuevo?.toLowerCase() === 'cobrado' &&
+        estadoAnterior?.toLowerCase() !== 'cobrado') {
 
-        // Buscar la caja correcta según el rango de tiempo (desde createdAt hasta cerradaAt o ahora)
-        const fechaPedido = pedido.createdAt ? new Date(pedido.createdAt) : null
+        // Buscar la caja correcta según la fecha del pedido
+        const fechaPedido = formatDateYMD(pedido.createdAt)
         let caja = null
         if (fechaPedido) {
-            // Buscar todas las cajas abiertas y encontrar la que contiene esta fecha en su rango
-            const cajasAbiertas = await Caja.find({ cerrada: false }).sort({ createdAt: -1 })
-            const ahora = new Date()
-            for (const c of cajasAbiertas) {
-                const inicioCaja = c.createdAt ? new Date(c.createdAt) : new Date(c.fecha + 'T00:00:00')
-                const finCaja = c.cerradaAt ? new Date(c.cerradaAt) : ahora
-                if (fechaPedido >= inicioCaja && fechaPedido <= finCaja) {
-                    caja = c
-                    break
-                }
-            }
+            // Buscar SOLO caja abierta de esa fecha específica (no hacer fallback a otras fechas)
+            caja = await Caja.findOne({ fecha: fechaPedido, cerrada: false }).sort({ createdAt: -1 })
         }
-        // Solo registrar si encontramos la caja correcta
+        // Solo registrar si encontramos la caja de esa fecha específica
         if (caja) {
             const efectivo = parseFloat(req.body.efectivo) || 0;
             const transferencia = parseFloat(req.body.transferencia) || 0;
@@ -282,12 +223,63 @@ export const updatePedido = asyncHandler(async (req, res) => {
  * DELETE /api/pedidos/:id
  */
 export const deletePedido = asyncHandler(async (req, res) => {
-    const { Pedido } = req.models
-    const pedido = await Pedido.findByIdAndDelete(req.params.id);
+    const { Pedido, Cliente, Caja } = req.models
+    const pedido = await Pedido.findById(req.params.id);
 
     if (!pedido) {
         return res.status(404).json({ error: 'Pedido no encontrado' });
     }
 
+    // Si se borra desde Histórico, NO ajustar caja (Histórico usa /api/historico/:id, pero lo soportamos igual)
+    const fromHistorico =
+        String(req.query?.fromHistorico || '').toLowerCase() === 'true' ||
+        String(req.headers?.['x-from-historico'] || '') === '1'
+
+    const estado = String(pedido.estado || '').toLowerCase()
+    const efectivo = parseFloat(pedido.efectivo) || 0
+    const transferencia = parseFloat(pedido.transferencia) || 0
+
+    // Revertir ingresos parciales en caja si el pedido NO está cobrado y tiene pagos registrados
+    if (!fromHistorico && estado !== 'cobrado' && (efectivo !== 0 || transferencia !== 0)) {
+        const fechaPedido = formatDateYMD(pedido.createdAt)
+        if (fechaPedido) {
+            const caja = await Caja.findOne({ fecha: fechaPedido, cerrada: false }).sort({ createdAt: -1 })
+            if (caja) {
+                caja.totalEfectivo = (caja.totalEfectivo || 0) - efectivo
+                caja.totalTransferencia = (caja.totalTransferencia || 0) - transferencia
+                if (caja.totalEfectivo < 0) caja.totalEfectivo = 0
+                if (caja.totalTransferencia < 0) caja.totalTransferencia = 0
+
+                caja.ventas = Array.isArray(caja.ventas) ? caja.ventas : []
+                caja.ventas.push({
+                    pedidoId: pedido._id.toString(),
+                    tipo: 'pedido',
+                    total: -1 * (efectivo + transferencia),
+                    efectivo: -1 * efectivo,
+                    transferencia: -1 * transferencia,
+                    fecha: new Date(),
+                })
+
+                await caja.save()
+            }
+        }
+    }
+
+    // Si estaba en cuenta corriente y NO estaba cobrado, mantener cuenta corriente sincronizada (restar saldo pendiente)
+    if (!fromHistorico && estado !== 'cobrado' && pedido.clienteId) {
+        const total = parseFloat(pedido.total) || 0
+        const pagado = (parseFloat(pedido.efectivo) || 0) + (parseFloat(pedido.transferencia) || 0)
+        const pendiente = total - pagado
+        if (pendiente > 0) {
+            const cliente = await Cliente.findById(pedido.clienteId)
+            if (cliente) {
+                cliente.cuentaCorriente = (parseFloat(cliente.cuentaCorriente) || 0) - pendiente
+                if (cliente.cuentaCorriente < 0) cliente.cuentaCorriente = 0
+                await cliente.save()
+            }
+        }
+    }
+
+    await Pedido.findByIdAndDelete(req.params.id)
     res.json({ success: true });
 });

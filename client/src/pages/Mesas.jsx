@@ -4,6 +4,7 @@ import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
 import { toastError, toastInfo, toastSuccess } from '../utils/toast'
 import { useModalHotkeys } from '../hooks/useModalHotkeys'
 import ProductCombobox from '../components/ProductCombobox'
+import { getYMDArgentina } from '../utils/date'
 
 const Mesas = () => {
     const [mesas, setMesas] = useState([])
@@ -72,7 +73,7 @@ const Mesas = () => {
     const fetchPedidos = async () => {
         try {
             const res = await api.get('/pedidos')
-            const fechaHoy = new Date().toISOString().split("T")[0]
+            const fechaHoy = getYMDArgentina(new Date())
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
             
             // Determinar qué fecha usar para filtrar
@@ -83,7 +84,7 @@ const Mesas = () => {
             const pedidosFiltrados = res.data.filter((p) => {
                 // Filtrar por fecha de la caja seleccionada
                 if (p.createdAt) {
-                    const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                    const fechaPedido = getYMDArgentina(p.createdAt)
                     return fechaPedido === fechaFiltro
                 }
                 
@@ -98,7 +99,7 @@ const Mesas = () => {
     // Función para obtener el nombre de la mesa según la fecha de la caja seleccionada
     // Busca el nombre en nombresPorFecha de la mesa usando la fecha de la caja seleccionada
     const getNombreMesa = (mesa) => {
-        const fechaHoy = new Date().toISOString().split("T")[0]
+        const fechaHoy = getYMDArgentina(new Date())
         const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
         // Usar la fecha de la caja seleccionada (puede ser hoy o una fecha anterior)
         const fechaFiltro = fechaCajaSeleccionada || fechaHoy
@@ -351,7 +352,7 @@ const Mesas = () => {
 
     const saveMesa = async () => {
         try {
-            const fechaHoy = new Date().toISOString().split("T")[0]
+            const fechaHoy = getYMDArgentina(new Date())
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
             // Usar la fecha de la caja seleccionada (puede ser hoy o una fecha anterior)
             const fechaFiltro = fechaCajaSeleccionada || fechaHoy
@@ -419,7 +420,7 @@ const Mesas = () => {
             try {
                 const res = await api.get('/pedidos')
                 const pedidosArray = Array.isArray(res.data) ? res.data : []
-                const fechaHoy = new Date().toISOString().split("T")[0]
+                const fechaHoy = getYMDArgentina(new Date())
                 // Obtener la fecha de la caja seleccionada desde localStorage
                 const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
                 
@@ -436,7 +437,7 @@ const Mesas = () => {
 
                     // Filtrar por fecha de la caja seleccionada (o hoy si no hay caja seleccionada)
                     if (p.createdAt) {
-                        const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                        const fechaPedido = getYMDArgentina(p.createdAt)
                         return fechaPedido === fechaFiltro
                     }
 

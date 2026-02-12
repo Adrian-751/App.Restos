@@ -61,7 +61,7 @@ const Caja = () => {
         const turnosEnRango = turnosArray.filter((t) => {
             if (!t || !t.createdAt) return false
             const fechaTurno = new Date(t.createdAt)
-            return fechaTurno >= inicioCaja && fechaTurno <= finCaja && t.estado?.toLowerCase() === 'cobrado'
+            return fechaTurno >= inicioCaja && fechaTurno <= finCaja && String(t.estado || '').toLowerCase() !== 'cancelado'
         })
         const cantidadTurnosDirectos = turnosEnRango.length
 
@@ -71,7 +71,7 @@ const Caja = () => {
         const pedidosEnRango = pedidosArray.filter((p) => {
             if (!p || !p.createdAt) return false
             const fechaPedido = new Date(p.createdAt)
-            return fechaPedido >= inicioCaja && fechaPedido <= finCaja && String(p.estado || '').toLowerCase() === 'cobrado'
+            return fechaPedido >= inicioCaja && fechaPedido <= finCaja && String(p.estado || '').toLowerCase() !== 'cancelado'
         })
 
         const turnosDesdePedidos = pedidosEnRango.reduce(

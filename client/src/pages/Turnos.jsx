@@ -3,6 +3,7 @@ import api from '../utils/api'
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
 import { toastError, toastInfo, toastSuccess } from '../utils/toast'
 import { useModalHotkeys } from '../hooks/useModalHotkeys'
+import { getYMDArgentina, moneyToCents } from '../utils/date'
 
 const Turnos = () => {
     const [turnos, setTurnos] = useState([])
@@ -72,7 +73,7 @@ const Turnos = () => {
     const fetchTurnos = async () => {
         try {
             const res = await api.get('/turnos')
-            const fechaHoy = new Date().toISOString().split("T")[0]
+            const fechaHoy = getYMDArgentina(new Date())
             
             // Obtener la fecha de la caja seleccionada desde localStorage
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
@@ -85,7 +86,7 @@ const Turnos = () => {
             // Filtrar turnos por la fecha de la caja seleccionada
             const turnosFiltrados = res.data.filter((t) => {
                 if (!t || !t.createdAt) return false
-                const fechaTurno = new Date(t.createdAt).toISOString().split("T")[0]
+                const fechaTurno = getYMDArgentina(t.createdAt)
                 return fechaTurno === fechaFiltro
             })
 
@@ -98,7 +99,7 @@ const Turnos = () => {
     const fetchPedidos = async () => {
         try {
             const res = await api.get('/pedidos')
-            const fechaHoy = new Date().toISOString().split("T")[0]
+            const fechaHoy = getYMDArgentina(new Date())
             // Obtener la fecha de la caja seleccionada desde localStorage
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
             
@@ -112,7 +113,7 @@ const Turnos = () => {
                 
                 // Filtrar por fecha de la caja seleccionada
                 if (p.createdAt) {
-                    const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                    const fechaPedido = getYMDArgentina(p.createdAt)
                     return fechaPedido === fechaFiltro
                 }
                 
@@ -262,7 +263,9 @@ const Turnos = () => {
         const totalTurno = parseFloat(turnoACobrar.total) || 0
 
         // Solo se marca como "Cobrado" si el pago es completo
-        const estadoFinal = totalPagado >= totalTurno ? 'Cobrado' : (turnoACobrar.estado || 'Pendiente')
+        const estadoFinal = moneyToCents(totalPagado) >= moneyToCents(totalTurno)
+            ? 'Cobrado'
+            : (turnoACobrar.estado || 'Pendiente')
 
         const turnoActualizado = {
             ...turnoACobrar,
@@ -284,7 +287,7 @@ const Turnos = () => {
             if (estadoFinal === 'Cobrado') {
                 toastSuccess('Turno cobrado. Caja actualizada.')
             } else {
-                const restante = totalTurno - totalPagado
+                const restante = (moneyToCents(totalTurno) - moneyToCents(totalPagado)) / 100
                 toastInfo(`Pago registrado. Restante: $${restante.toLocaleString()}`)
             }
         } catch (error) {

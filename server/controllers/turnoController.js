@@ -1,5 +1,5 @@
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { getTodayYMD } from '../utils/date.js'
+import { formatDateYMD } from '../utils/date.js'
 
 /**
  * Obtener todos los turnos (excluyendo los eliminados de la sección Turnos)
@@ -74,7 +74,7 @@ export const getTurnos = asyncHandler(async (req, res) => {
  * POST /api/turnos
  */
 export const createTurno = asyncHandler(async (req, res) => {
-    const { Turno } = req.models
+    const { Turno, Caja } = req.models
     const { nombre, pedidoId, mesaId, clienteId, total, efectivo, transferencia, observaciones, fecha } = req.body;
 
     // Si se proporciona una fecha, usar esa fecha para contar turnos y crear el turno
@@ -115,7 +115,9 @@ export const createTurno = asyncHandler(async (req, res) => {
 
     // Si hay fecha personalizada, establecer createdAt
     if (fecha) {
-        const fechaDate = new Date(fecha + 'T12:00:00')
+        const now = new Date()
+        const hhmmss = now.toTimeString().slice(0, 8)
+        const fechaDate = new Date(`${fecha}T${hhmmss}`)
         if (!isNaN(fechaDate.getTime())) {
             turnoData.createdAt = fechaDate
             turnoData.updatedAt = fechaDate
@@ -123,6 +125,35 @@ export const createTurno = asyncHandler(async (req, res) => {
     }
 
     const turno = await Turno.create(turnoData)
+
+    // Si se creó con pago inicial, impactar caja inmediatamente (misma lógica que pagos parciales)
+    {
+        const e0 = parseFloat(turno.efectivo) || 0
+        const t0 = parseFloat(turno.transferencia) || 0
+        if (e0 !== 0 || t0 !== 0) {
+            const fechaTurno = formatDateYMD(turno.createdAt)
+            if (fechaTurno) {
+                const caja = await Caja.findOne({ fecha: fechaTurno, cerrada: false }).sort({ createdAt: -1 })
+                if (caja) {
+                    caja.totalEfectivo = (caja.totalEfectivo || 0) + e0
+                    caja.totalTransferencia = (caja.totalTransferencia || 0) + t0
+                    if (caja.totalEfectivo < 0) caja.totalEfectivo = 0
+                    if (caja.totalTransferencia < 0) caja.totalTransferencia = 0
+
+                    caja.ventas = Array.isArray(caja.ventas) ? caja.ventas : []
+                    caja.ventas.push({
+                        turnoId: turno._id.toString(),
+                        tipo: 'turno',
+                        total: (e0 + t0),
+                        efectivo: e0,
+                        transferencia: t0,
+                        fecha: new Date(),
+                    })
+                    await caja.save()
+                }
+            }
+        }
+    }
 
     res.status(201).json(turno)
 })
@@ -152,23 +183,12 @@ export const updateTurno = asyncHandler(async (req, res) => {
         const deltaT = nextT - prevT
 
         if (deltaE !== 0 || deltaT !== 0) {
-            // Buscar la caja correcta según el rango de tiempo (desde createdAt hasta cerradaAt o ahora)
-            const fechaTurno = turno.createdAt ? new Date(turno.createdAt) : null
-            let caja = null
-            if (fechaTurno) {
-                // Buscar todas las cajas abiertas y encontrar la que contiene esta fecha en su rango
-                const cajasAbiertas = await Caja.find({ cerrada: false }).sort({ createdAt: -1 })
-                const ahora = new Date()
-                for (const c of cajasAbiertas) {
-                    const inicioCaja = c.createdAt ? new Date(c.createdAt) : new Date(c.fecha + 'T00:00:00')
-                    const finCaja = c.cerradaAt ? new Date(c.cerradaAt) : ahora
-                    if (fechaTurno >= inicioCaja && fechaTurno <= finCaja) {
-                        caja = c
-                        break
-                    }
-                }
-            }
-            // Solo registrar si encontramos la caja correcta
+            // Buscar caja abierta de la MISMA fecha del turno (soporta caja anterior)
+            const fechaTurnoYMD = formatDateYMD(turno.createdAt)
+            const caja = fechaTurnoYMD
+                ? await Caja.findOne({ fecha: fechaTurnoYMD, cerrada: false }).sort({ createdAt: -1 })
+                : null
+
             if (caja) {
                 caja.totalEfectivo = (caja.totalEfectivo || 0) + deltaE
                 caja.totalTransferencia = (caja.totalTransferencia || 0) + deltaT
@@ -194,28 +214,16 @@ export const updateTurno = asyncHandler(async (req, res) => {
         if (estadoNuevo?.toLowerCase() === 'cobrado' &&
             estadoAnterior?.toLowerCase() !== 'cobrado') {
 
-        // Buscar la caja correcta según el rango de tiempo (desde createdAt hasta cerradaAt o ahora)
-        const fechaTurno = turno.createdAt ? new Date(turno.createdAt) : null
-        let caja = null
-        if (fechaTurno) {
-            // Buscar todas las cajas abiertas y encontrar la que contiene esta fecha en su rango
-            const cajasAbiertas = await Caja.find({ cerrada: false }).sort({ createdAt: -1 })
-            const ahora = new Date()
-            for (const c of cajasAbiertas) {
-                const inicioCaja = c.createdAt ? new Date(c.createdAt) : new Date(c.fecha + 'T00:00:00')
-                const finCaja = c.cerradaAt ? new Date(c.cerradaAt) : ahora
-                if (fechaTurno >= inicioCaja && fechaTurno <= finCaja) {
-                    caja = c
-                    break
-                }
-            }
-        }
-        // Solo registrar si encontramos la caja correcta
+        const fechaTurnoYMD = formatDateYMD(turno.createdAt)
+        const caja = fechaTurnoYMD
+            ? await Caja.findOne({ fecha: fechaTurnoYMD, cerrada: false }).sort({ createdAt: -1 })
+            : null
 
         if (caja) {
-            const efectivo = parseFloat(req.body.efectivo) || turno.efectivo || 0;
-            const transferencia = parseFloat(req.body.transferencia) || turno.transferencia || 0;
-            const total = parseFloat(req.body.total) || turno.total || 0;
+            const bodyHas = (k) => Object.prototype.hasOwnProperty.call(req.body || {}, k)
+            const efectivo = bodyHas('efectivo') ? (parseFloat(req.body.efectivo) || 0) : (parseFloat(turno.efectivo) || 0)
+            const transferencia = bodyHas('transferencia') ? (parseFloat(req.body.transferencia) || 0) : (parseFloat(turno.transferencia) || 0)
+            const total = bodyHas('total') ? (parseFloat(req.body.total) || 0) : (parseFloat(turno.total) || 0)
 
             if (!caja.ventas) caja.ventas = [];
             caja.ventas.push({
@@ -243,7 +251,7 @@ export const updateTurno = asyncHandler(async (req, res) => {
  * DELETE /api/turnos/:id
  */
 export const deleteTurno = asyncHandler(async (req, res) => {
-    const { Turno } = req.models
+    const { Turno, Caja } = req.models
     const turno = await Turno.findById(req.params.id);
 
     if (!turno) {
@@ -258,6 +266,33 @@ export const deleteTurno = asyncHandler(async (req, res) => {
             success: true,
             message: 'Turno removido de la sección Turnos, pero permanece en Histórico'
         });
+    }
+
+    // Para turnos no cobrados, si tuvo pagos parciales, revertir caja (misma fecha del turno)
+    const efectivo = parseFloat(turno.efectivo) || 0
+    const transferencia = parseFloat(turno.transferencia) || 0
+    if (efectivo !== 0 || transferencia !== 0) {
+        const fechaTurnoYMD = formatDateYMD(turno.createdAt)
+        const caja = fechaTurnoYMD
+            ? await Caja.findOne({ fecha: fechaTurnoYMD, cerrada: false }).sort({ createdAt: -1 })
+            : null
+        if (caja) {
+            caja.totalEfectivo = (caja.totalEfectivo || 0) - efectivo
+            caja.totalTransferencia = (caja.totalTransferencia || 0) - transferencia
+            if (caja.totalEfectivo < 0) caja.totalEfectivo = 0
+            if (caja.totalTransferencia < 0) caja.totalTransferencia = 0
+
+            caja.ventas = Array.isArray(caja.ventas) ? caja.ventas : []
+            caja.ventas.push({
+                turnoId: turno._id.toString(),
+                tipo: 'turno',
+                total: -1 * (efectivo + transferencia),
+                efectivo: -1 * efectivo,
+                transferencia: -1 * transferencia,
+                fecha: new Date(),
+            })
+            await caja.save()
+        }
     }
 
     // Para turnos no cobrados, eliminarlos normalmente
