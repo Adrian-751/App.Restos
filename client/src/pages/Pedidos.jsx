@@ -67,38 +67,30 @@ const Pedidos = () => {
     const fetchPedidos = async () => {
         try {
             const res = await api.get('/pedidos')
-            // Obtener la fecha de la caja seleccionada desde localStorage
-            let fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
             const fechaHoy = new Date().toISOString().split("T")[0]
+            
+            // Obtener la fecha de la caja seleccionada desde localStorage
+            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            
+            // Determinar qué fecha usar para filtrar
+            // Si hay fecha de caja seleccionada, usar esa fecha (puede ser hoy o un día anterior)
+            // Si NO hay fecha de caja seleccionada, usar la fecha de hoy
+            const fechaFiltro = fechaCajaSeleccionada || fechaHoy
 
-            // Si la fecha guardada es de hoy o no existe, limpiarla para mostrar todos los pedidos de hoy
-            if (!fechaCajaSeleccionada || fechaCajaSeleccionada === fechaHoy) {
-                fechaCajaSeleccionada = null
-            }
-
-            const esCajaDeHoy = fechaCajaSeleccionada === fechaHoy
-
-            // Mostrar todos los pedidos NO cobrados (incluye cuenta corriente / pagos parciales)
-            // Si la caja seleccionada es de hoy O no hay fecha seleccionada, mostrar TODOS los pedidos pendientes
-            // Solo filtrar por fecha si la caja seleccionada es de un día anterior
+            // Filtrar pedidos: solo mostrar los NO cobrados de la fecha de la caja seleccionada
             const pedidosFiltrados = res.data.filter((p) => {
                 const est = String(p?.estado || '').toLowerCase()
                 // Excluir solo los cobrados y cancelados
                 if (est === 'cobrado' || est === 'cancelado') return false
 
-                // Si NO hay fecha seleccionada O la fecha seleccionada es de hoy, mostrar TODOS los pedidos pendientes
-                if (!fechaCajaSeleccionada || esCajaDeHoy) {
-                    return true
-                }
-
-                // Si hay una fecha de caja seleccionada de un día anterior, filtrar por esa fecha
-                if (fechaCajaSeleccionada && p.createdAt) {
+                // Filtrar por fecha de la caja seleccionada
+                if (p.createdAt) {
                     const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
-                    return fechaPedido === fechaCajaSeleccionada
+                    return fechaPedido === fechaFiltro
                 }
 
-                // Por defecto, mostrar todos los pendientes
-                return true
+                // Si no tiene createdAt, no mostrarlo
+                return false
             })
             setPedidos(pedidosFiltrados)
         } catch (error) {

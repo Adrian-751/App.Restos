@@ -27,11 +27,14 @@ export const getHistorico = asyncHandler(async (req, res) => {
         pedidoObj.id = pedidoObj._id || pedidoObj.id;
 
         // Agregar información de mesa
+        // Priorizar mesaNombre del pedido (guardado cuando se creó el pedido)
+        // Esto permite mostrar el nombre correcto incluso si la mesa ya no tiene nombre
         if (pedido.mesaId && typeof pedido.mesaId === 'object') {
-            pedidoObj.mesaNombre = pedido.mesaId.nombre;
             pedidoObj.mesaNumero = pedido.mesaId.numero;
+            // Usar mesaNombre del pedido si existe, sino usar el nombre de la mesa
+            pedidoObj.mesaNombre = pedido.mesaNombre || pedido.mesaId.nombre || null;
         } else {
-            pedidoObj.mesaNombre = null;
+            pedidoObj.mesaNombre = pedido.mesaNombre || null;
             pedidoObj.mesaNumero = null;
         }
 
@@ -80,9 +83,11 @@ export const getHistorico = asyncHandler(async (req, res) => {
             };
 
             // Agregar información de mesa si el pedido tiene mesa
+            // Priorizar mesaNombre del pedido (guardado cuando se creó el pedido)
             if (pedido.mesaId && typeof pedido.mesaId === 'object') {
-                turnoObj.mesaNombre = pedido.mesaId.nombre;
                 turnoObj.mesaNumero = pedido.mesaId.numero;
+                // Usar mesaNombre del pedido si existe, sino usar el nombre de la mesa
+                turnoObj.mesaNombre = pedido.mesaNombre || pedido.mesaId.nombre || null;
             } else {
                 turnoObj.mesaNombre = null;
                 turnoObj.mesaNumero = null;

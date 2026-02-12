@@ -72,18 +72,22 @@ const Turnos = () => {
     const fetchTurnos = async () => {
         try {
             const res = await api.get('/turnos')
+            const fechaHoy = new Date().toISOString().split("T")[0]
+            
             // Obtener la fecha de la caja seleccionada desde localStorage
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            
+            // Determinar qué fecha usar para filtrar
+            // Si hay fecha de caja seleccionada, usar esa fecha (puede ser hoy o un día anterior)
+            // Si NO hay fecha de caja seleccionada, usar la fecha de hoy
+            const fechaFiltro = fechaCajaSeleccionada || fechaHoy
 
-            // Si hay una fecha de caja seleccionada, filtrar turnos por esa fecha
-            let turnosFiltrados = res.data
-            if (fechaCajaSeleccionada) {
-                turnosFiltrados = res.data.filter((t) => {
-                    if (!t || !t.createdAt) return false
-                    const fechaTurno = new Date(t.createdAt).toISOString().split("T")[0]
-                    return fechaTurno === fechaCajaSeleccionada
-                })
-            }
+            // Filtrar turnos por la fecha de la caja seleccionada
+            const turnosFiltrados = res.data.filter((t) => {
+                if (!t || !t.createdAt) return false
+                const fechaTurno = new Date(t.createdAt).toISOString().split("T")[0]
+                return fechaTurno === fechaFiltro
+            })
 
             setTurnos(turnosFiltrados)
         } catch (error) {
@@ -94,19 +98,26 @@ const Turnos = () => {
     const fetchPedidos = async () => {
         try {
             const res = await api.get('/pedidos')
+            const fechaHoy = new Date().toISOString().split("T")[0]
             // Obtener la fecha de la caja seleccionada desde localStorage
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            
+            // Determinar qué fecha usar para filtrar
+            const fechaFiltro = fechaCajaSeleccionada || fechaHoy
 
-            let pedidosFiltrados = res.data.filter(p => p.estado?.toLowerCase() !== 'cobrado')
-
-            // Si hay una fecha de caja seleccionada, filtrar pedidos por esa fecha
-            if (fechaCajaSeleccionada) {
-                pedidosFiltrados = pedidosFiltrados.filter((p) => {
-                    if (!p || !p.createdAt) return false
+            // Filtrar pedidos: solo mostrar los NO cobrados de la fecha de la caja seleccionada
+            let pedidosFiltrados = res.data.filter((p) => {
+                const est = String(p?.estado || '').toLowerCase()
+                if (est === 'cobrado' || est === 'cancelado') return false
+                
+                // Filtrar por fecha de la caja seleccionada
+                if (p.createdAt) {
                     const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
-                    return fechaPedido === fechaCajaSeleccionada
-                })
-            }
+                    return fechaPedido === fechaFiltro
+                }
+                
+                return false
+            })
 
             setPedidos(pedidosFiltrados)
         } catch (error) {

@@ -152,14 +152,23 @@ export const updateTurno = asyncHandler(async (req, res) => {
         const deltaT = nextT - prevT
 
         if (deltaE !== 0 || deltaT !== 0) {
-            // Buscar la caja correcta según la fecha del turno
-            const fechaTurno = turno.createdAt ? new Date(turno.createdAt).toISOString().split("T")[0] : null
+            // Buscar la caja correcta según el rango de tiempo (desde createdAt hasta cerradaAt o ahora)
+            const fechaTurno = turno.createdAt ? new Date(turno.createdAt) : null
             let caja = null
             if (fechaTurno) {
-                // Buscar SOLO caja abierta de esa fecha específica (no hacer fallback a otras fechas)
-                caja = await Caja.findOne({ fecha: fechaTurno, cerrada: false }).sort({ createdAt: -1 })
+                // Buscar todas las cajas abiertas y encontrar la que contiene esta fecha en su rango
+                const cajasAbiertas = await Caja.find({ cerrada: false }).sort({ createdAt: -1 })
+                const ahora = new Date()
+                for (const c of cajasAbiertas) {
+                    const inicioCaja = c.createdAt ? new Date(c.createdAt) : new Date(c.fecha + 'T00:00:00')
+                    const finCaja = c.cerradaAt ? new Date(c.cerradaAt) : ahora
+                    if (fechaTurno >= inicioCaja && fechaTurno <= finCaja) {
+                        caja = c
+                        break
+                    }
+                }
             }
-            // Solo registrar si encontramos la caja de esa fecha específica
+            // Solo registrar si encontramos la caja correcta
             if (caja) {
                 caja.totalEfectivo = (caja.totalEfectivo || 0) + deltaE
                 caja.totalTransferencia = (caja.totalTransferencia || 0) + deltaT
@@ -181,18 +190,27 @@ export const updateTurno = asyncHandler(async (req, res) => {
         }
     }
 
-    // Si cambió a "Cobrado"
-    if (estadoNuevo?.toLowerCase() === 'cobrado' &&
-        estadoAnterior?.toLowerCase() !== 'cobrado') {
+        // Si cambió a "Cobrado"
+        if (estadoNuevo?.toLowerCase() === 'cobrado' &&
+            estadoAnterior?.toLowerCase() !== 'cobrado') {
 
-        // Buscar la caja correcta según la fecha del turno
-        const fechaTurno = turno.createdAt ? new Date(turno.createdAt).toISOString().split("T")[0] : null
+        // Buscar la caja correcta según el rango de tiempo (desde createdAt hasta cerradaAt o ahora)
+        const fechaTurno = turno.createdAt ? new Date(turno.createdAt) : null
         let caja = null
         if (fechaTurno) {
-            // Buscar SOLO caja abierta de esa fecha específica (no hacer fallback a otras fechas)
-            caja = await Caja.findOne({ fecha: fechaTurno, cerrada: false }).sort({ createdAt: -1 })
+            // Buscar todas las cajas abiertas y encontrar la que contiene esta fecha en su rango
+            const cajasAbiertas = await Caja.find({ cerrada: false }).sort({ createdAt: -1 })
+            const ahora = new Date()
+            for (const c of cajasAbiertas) {
+                const inicioCaja = c.createdAt ? new Date(c.createdAt) : new Date(c.fecha + 'T00:00:00')
+                const finCaja = c.cerradaAt ? new Date(c.cerradaAt) : ahora
+                if (fechaTurno >= inicioCaja && fechaTurno <= finCaja) {
+                    caja = c
+                    break
+                }
+            }
         }
-        // Solo registrar si encontramos la caja de esa fecha específica
+        // Solo registrar si encontramos la caja correcta
 
         if (caja) {
             const efectivo = parseFloat(req.body.efectivo) || turno.efectivo || 0;

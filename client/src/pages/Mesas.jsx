@@ -9,6 +9,7 @@ const Mesas = () => {
     const [mesas, setMesas] = useState([])
     const [productos, setProductos] = useState([])
     const [clientes, setClientes] = useState([])
+    const [pedidos, setPedidos] = useState([])
     const [showModal, setShowModal] = useState(false)
     const [editingMesa, setEditingMesa] = useState(null)
     const [formData, setFormData] = useState({ numero: '', nombre: '', color: '#e11d48' })
@@ -17,6 +18,28 @@ const Mesas = () => {
         fetchMesas()
         fetchProductos()
         fetchClientes()
+        fetchPedidos()
+
+        // Escuchar cambios en la caja seleccionada (localStorage)
+        const handleStorageChange = (e) => {
+            if (e.key === 'cajaSeleccionadaFecha' || e.key === null) {
+                fetchMesas() // Recargar mesas para actualizar los nombres según la fecha
+                fetchPedidos()
+            }
+        }
+        window.addEventListener('storage', handleStorageChange)
+
+        // También escuchar eventos personalizados cuando se cambia la caja desde la misma pestaña
+        const handleCajaChange = () => {
+            fetchMesas() // Recargar mesas para actualizar los nombres según la fecha
+            fetchPedidos()
+        }
+        window.addEventListener('caja-seleccionada-cambiada', handleCajaChange)
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange)
+            window.removeEventListener('caja-seleccionada-cambiada', handleCajaChange)
+        }
     }, [])
 
     const fetchMesas = async () => {
@@ -44,6 +67,75 @@ const Mesas = () => {
         } catch (error) {
             console.error('Error fetching clientes:', error)
         }
+    }
+
+    const fetchPedidos = async () => {
+        try {
+            const res = await api.get('/pedidos')
+            const fechaHoy = new Date().toISOString().split("T")[0]
+            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            
+            // Determinar qué fecha usar para filtrar
+            const fechaFiltro = fechaCajaSeleccionada || fechaHoy
+
+            // Filtrar pedidos por fecha de la caja seleccionada (incluir todos, no solo pendientes)
+            // Esto nos permite obtener el nombre de la mesa desde pedidos cobrados también
+            const pedidosFiltrados = res.data.filter((p) => {
+                // Filtrar por fecha de la caja seleccionada
+                if (p.createdAt) {
+                    const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
+                    return fechaPedido === fechaFiltro
+                }
+                
+                return false
+            })
+            setPedidos(pedidosFiltrados)
+        } catch (error) {
+            console.error('Error fetching pedidos:', error)
+        }
+    }
+
+    // Función para obtener el nombre de la mesa según la fecha de la caja seleccionada
+    // Busca el nombre en nombresPorFecha de la mesa usando la fecha de la caja seleccionada
+    const getNombreMesa = (mesa) => {
+        const fechaHoy = new Date().toISOString().split("T")[0]
+        const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+        // Usar la fecha de la caja seleccionada (puede ser hoy o una fecha anterior)
+        const fechaFiltro = fechaCajaSeleccionada || fechaHoy
+
+        // Buscar el nombre en nombresPorFecha usando la fecha de la caja seleccionada
+        if (mesa.nombresPorFecha) {
+            let nombrePorFecha = null
+            
+            // MongoDB puede devolver Maps como objetos planos
+            if (mesa.nombresPorFecha instanceof Map) {
+                nombrePorFecha = mesa.nombresPorFecha.get(fechaFiltro)
+            } else if (typeof mesa.nombresPorFecha === 'object' && mesa.nombresPorFecha !== null) {
+                // Acceder directamente como objeto
+                // MongoDB puede devolver el Map como un objeto con claves como strings
+                nombrePorFecha = mesa.nombresPorFecha[fechaFiltro]
+                
+                // Si no se encuentra, intentar con diferentes formatos de fecha
+                if (!nombrePorFecha) {
+                    // Intentar buscar en todas las claves (por si hay algún problema de formato)
+                    const keys = Object.keys(mesa.nombresPorFecha)
+                    for (const key of keys) {
+                        if (key === fechaFiltro || key.includes(fechaFiltro)) {
+                            nombrePorFecha = mesa.nombresPorFecha[key]
+                            break
+                        }
+                    }
+                }
+            }
+            
+            if (nombrePorFecha && String(nombrePorFecha).trim()) {
+                return String(nombrePorFecha).trim()
+            }
+        }
+
+        // Si no hay nombre guardado para esa fecha, NO mostrar el nombre (devolver string vacío)
+        // Esto evita mostrar nombres de mesas de otras fechas
+        return ''
     }
 
     // Estados para el modal de nuevo pedido
@@ -242,7 +334,14 @@ const Mesas = () => {
 
     const openEditModal = (mesa = null) => {
         if (mesa) {
-            setFormData({ numero: mesa.numero, nombre: mesa.nombre, color: mesa.color })
+            // Obtener el nombre de la mesa para la fecha de la caja seleccionada
+            // Si no hay nombre para esa fecha, el input estará vacío
+            const nombreParaEstaFecha = getNombreMesa(mesa)
+            setFormData({ 
+                numero: mesa.numero, 
+                nombre: nombreParaEstaFecha, // Solo mostrar nombre de la fecha de la caja seleccionada
+                color: mesa.color 
+            })
         } else {
             setFormData({ numero: '', nombre: '', color: '#e11d48' })
         }
@@ -252,10 +351,23 @@ const Mesas = () => {
 
     const saveMesa = async () => {
         try {
+            const fechaHoy = new Date().toISOString().split("T")[0]
+            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            // Usar la fecha de la caja seleccionada (puede ser hoy o una fecha anterior)
+            const fechaFiltro = fechaCajaSeleccionada || fechaHoy
+            
             if (editingMesa) {
-                await api.put(`/mesas/${editingMesa._id}`, formData)
+                // Incluir la fecha de la caja seleccionada para guardar el nombre asociado a esa fecha
+                await api.put(`/mesas/${editingMesa._id}`, {
+                    ...formData,
+                    fecha: fechaFiltro
+                })
             } else {
-                await api.post('/mesas', formData)
+                // Al crear una mesa nueva, también incluir la fecha de la caja seleccionada
+                await api.post('/mesas', {
+                    ...formData,
+                    fecha: fechaFiltro
+                })
             }
             setShowModal(false)
             setEditingMesa(null)
@@ -307,8 +419,12 @@ const Mesas = () => {
             try {
                 const res = await api.get('/pedidos')
                 const pedidosArray = Array.isArray(res.data) ? res.data : []
+                const fechaHoy = new Date().toISOString().split("T")[0]
                 // Obtener la fecha de la caja seleccionada desde localStorage
                 const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+                
+                // Determinar qué fecha usar para filtrar
+                const fechaFiltro = fechaCajaSeleccionada || fechaHoy
 
                 const candidatos = pedidosArray.filter((p) => {
                     if (!p) return false
@@ -318,13 +434,13 @@ const Mesas = () => {
                     const est = String(p.estado || '').toLowerCase()
                     if (est === 'cobrado' || est === 'cancelado') return false
 
-                    // Si hay una fecha de caja seleccionada, filtrar por esa fecha
-                    if (fechaCajaSeleccionada && p.createdAt) {
+                    // Filtrar por fecha de la caja seleccionada (o hoy si no hay caja seleccionada)
+                    if (p.createdAt) {
                         const fechaPedido = new Date(p.createdAt).toISOString().split("T")[0]
-                        return fechaPedido === fechaCajaSeleccionada
+                        return fechaPedido === fechaFiltro
                     }
 
-                    return true
+                    return false
                 })
                 const existente = candidatos.sort(
                     (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
@@ -527,7 +643,9 @@ const Mesas = () => {
                             style={{ backgroundColor: mesa.color, opacity: mesa.estado === 'ocupada' ? 0.8 : mesa.estado === 'reservada' ? 0.9 : 1 }}
                         >
                             <span className="text-sm">{mesa.numero}</span>
-                            <span className="text-xs">{mesa.nombre}</span>
+                            {getNombreMesa(mesa) && (
+                                <span className="text-xs">{getNombreMesa(mesa)}</span>
+                            )}
                             {mesa.estado !== 'libre' && (
                                 <span className="text-xs mt-1">
                                     {mesa.estado === 'ocupada' ? '🔴' : '🟣'}
@@ -630,11 +748,14 @@ const Mesas = () => {
                                     className="input-field"
                                 >
                                     <option value="">Sin Mesa</option>
-                                    {mesas.map((mesa) => (
-                                        <option key={mesa._id} value={mesa._id}>
-                                            Mesa {mesa.numero} - {mesa.nombre}
-                                        </option>
-                                    ))}
+                                    {mesas.map((mesa) => {
+                                        const nombreMesa = getNombreMesa(mesa)
+                                        return (
+                                            <option key={mesa._id} value={mesa._id}>
+                                                Mesa {mesa.numero}{nombreMesa ? ` - ${nombreMesa}` : ''}
+                                            </option>
+                                        )
+                                    })}
                                 </select>
                             </div>
 

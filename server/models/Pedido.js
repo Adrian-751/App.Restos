@@ -11,6 +11,11 @@ const pedidoSchema = new mongoose.Schema({
         ref: 'Mesa',
         default: null
     },
+    mesaNombre: {
+        type: String,
+        default: '',
+        trim: true
+    },
     clienteId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Cliente',

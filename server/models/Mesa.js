@@ -11,6 +11,10 @@ const mesaSchema = new mongoose.Schema({
         default: '',
         trim: true
     },
+    nombresPorFecha: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {}
+    },
     x: {
         type: Number,
         default: 0

@@ -87,7 +87,7 @@ const Layout = ({ children }) => {
             {/* Bottom Navigation */}
             {!isAuthPage && (
                 <nav className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900 border-t border-slate-700 shadow-2xl pb-[env(safe-area-inset-bottom)] touch-manipulation">
-                    <div className="container mx-auto px-4">
+                <div className="container mx-auto px-4">
                         <div className="relative">
                             {/* Botón izquierda (móvil) */}
                             <button
@@ -114,28 +114,28 @@ const Layout = ({ children }) => {
                                 className="flex items-center gap-2 py-3 overflow-x-auto sm:overflow-x-visible sm:justify-around scroll-smooth px-10 sm:px-0 touch-pan-x"
                                 style={{ WebkitOverflowScrolling: 'touch' }}
                             >
-                                {navItems.map((item) => {
-                                    const isActive = item.path === '/'
-                                        ? (location.pathname === '/' || location.pathname === '/panel')
-                                        : location.pathname === item.path
+                        {navItems.map((item) => {
+                            const isActive = item.path === '/'
+                                ? (location.pathname === '/' || location.pathname === '/panel')
+                                : location.pathname === item.path
 
-                                    return (
-                                        <Link
-                                            key={item.path}
-                                            to={item.path}
+                            return (
+                                <Link
+                                    key={item.path}
+                                    to={item.path}
                                             className={`flex flex-col items-center space-y-1 px-4 py-2 rounded-lg transition-all duration-200 shrink-0 ${isActive
-                                                ? 'bg-fuxia-primary text-white'
-                                                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                                                }`}
-                                        >
-                                            <span className="text-2xl">{item.icon}</span>
+                                        ? 'bg-fuxia-primary text-white'
+                                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                        }`}
+                                >
+                                    <span className="text-2xl">{item.icon}</span>
                                             <span className="text-xs font-medium whitespace-nowrap">{item.label}</span>
-                                        </Link>
-                                    )
-                                })}
+                                </Link>
+                            )
+                        })}
                             </div>
-                        </div>
                     </div>
+                </div>
                 </nav>
             )}
 

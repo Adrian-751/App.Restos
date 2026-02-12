@@ -24,7 +24,6 @@ export const abrirCaja = asyncHandler(async (req, res) => {
 
     // Usar la fecha proporcionada o la de hoy por defecto
     const fechaCaja = fecha || getTodayYMD();
-    const hoy = getTodayYMD();
 
     // Si no se permite múltiples cajas y ya hay una abierta, verificar
     if (!permitirMultiples) {
@@ -102,19 +101,36 @@ export const cerrarCaja = asyncHandler(async (req, res) => {
 
     await caja.save();
 
-    // Reset del "nombre" de las mesas solo si se está cerrando la caja del día actual (hoy)
-    // Esto evita que se borren los nombres si el cliente está trabajando después de medianoche
+    // Al cerrar CUALQUIER caja, borrar los nombres de las mesas para esa fecha específica
+    // Esto permite que al abrir una caja nueva de esa fecha, las mesas aparezcan sin nombre
+    const fechaCaja = caja.fecha
+    
+    // Borrar el nombre actual de las mesas (solo si es la caja del día actual)
     const hoy = getTodayYMD()
     if (caja.fecha === hoy) {
-        // NO borrar nombre si hay pedidos sin cobrar asociados a la mesa
-        const mesasConPedidosAbiertos = await Pedido.distinct('mesaId', {
-            mesaId: { $ne: null },
-            estado: { $nin: ['Cobrado', 'Cancelado'] }
-        })
         await Mesa.updateMany(
-            { _id: { $nin: mesasConPedidosAbiertos } },
+            {},
             { $set: { nombre: '' } }
         )
+    }
+    
+    // Borrar los nombres de nombresPorFecha para la fecha de esta caja específica
+    // Esto se hace para TODAS las cajas (no solo la de hoy)
+    const mesas = await Mesa.find({})
+    for (const mesa of mesas) {
+        if (mesa.nombresPorFecha) {
+            // Convertir a objeto si es necesario
+            const nombresObj = mesa.nombresPorFecha instanceof Map 
+                ? Object.fromEntries(mesa.nombresPorFecha) 
+                : (typeof mesa.nombresPorFecha === 'object' && mesa.nombresPorFecha !== null 
+                    ? { ...mesa.nombresPorFecha } 
+                    : {})
+            
+            // Eliminar el nombre de la fecha de esta caja específica
+            delete nombresObj[fechaCaja]
+            mesa.nombresPorFecha = nombresObj
+            await mesa.save()
+        }
     }
 
     res.json(caja);
@@ -188,4 +204,31 @@ export const getTodasCajas = asyncHandler(async (req, res) => {
 
     const cajas = await Caja.find(query).sort({ fecha: -1, createdAt: -1 })
     res.json(cajas)
+})
+
+/**
+ * Actualizar fecha de caja abierta
+ * PUT /api/caja/actualizar-fecha
+ */
+export const actualizarFechaCaja = asyncHandler(async (req, res) => {
+    const { Caja } = req.models
+    const { id, fecha } = req.body
+
+    if (!id || !fecha) {
+        return res.status(400).json({ error: 'Se requiere id y fecha' })
+    }
+
+    const caja = await Caja.findById(id)
+    if (!caja) {
+        return res.status(404).json({ error: 'Caja no encontrada' })
+    }
+
+    if (caja.cerrada) {
+        return res.status(400).json({ error: 'No se puede actualizar la fecha de una caja cerrada' })
+    }
+
+    caja.fecha = fecha
+    await caja.save()
+
+    res.json(caja)
 })
