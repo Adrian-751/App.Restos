@@ -74,10 +74,10 @@ const Turnos = () => {
         try {
             const res = await api.get('/turnos')
             const fechaHoy = getYMDArgentina(new Date())
-            
+
             // Obtener la fecha de la caja seleccionada desde localStorage
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
-            
+
             // Determinar qué fecha usar para filtrar
             // Si hay fecha de caja seleccionada, usar esa fecha (puede ser hoy o un día anterior)
             // Si NO hay fecha de caja seleccionada, usar la fecha de hoy
@@ -102,7 +102,7 @@ const Turnos = () => {
             const fechaHoy = getYMDArgentina(new Date())
             // Obtener la fecha de la caja seleccionada desde localStorage
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
-            
+
             // Determinar qué fecha usar para filtrar
             const fechaFiltro = fechaCajaSeleccionada || fechaHoy
 
@@ -110,13 +110,13 @@ const Turnos = () => {
             let pedidosFiltrados = res.data.filter((p) => {
                 const est = String(p?.estado || '').toLowerCase()
                 if (est === 'cobrado' || est === 'cancelado') return false
-                
+
                 // Filtrar por fecha de la caja seleccionada
                 if (p.createdAt) {
                     const fechaPedido = getYMDArgentina(p.createdAt)
                     return fechaPedido === fechaFiltro
                 }
-                
+
                 return false
             })
 

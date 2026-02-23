@@ -183,8 +183,15 @@ export const updatePedido = asyncHandler(async (req, res) => {
     }
 
     // Si cambió a "Cobrado"
-    if (estadoNuevo?.toLowerCase() === 'cobrado' &&
-        estadoAnterior?.toLowerCase() !== 'cobrado') {
+    const becameCobrado =
+        estadoNuevo?.toLowerCase() === 'cobrado' &&
+        estadoAnterior?.toLowerCase() !== 'cobrado'
+
+    if (becameCobrado) {
+        // Fijar cobradoAt una sola vez (si no existe), para poder auditar/filtrar por momento de cobro
+        if (!pedido.cobradoAt) {
+            req.body.cobradoAt = new Date()
+        }
 
         // Buscar la caja correcta según la fecha del pedido
         const fechaPedido = formatDateYMD(pedido.createdAt)

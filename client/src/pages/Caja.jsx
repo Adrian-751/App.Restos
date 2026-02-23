@@ -45,7 +45,7 @@ const Caja = () => {
         const totalEfectivo = Number(cajaData.totalEfectivo || 0)
         const totalTransferencia = Number(cajaData.totalTransferencia || 0)
 
-        // Calcular turnos: solo contar cantidad, NO sumar montos
+        // Calcular turnos: solo contar cantidad COBRADA, NO sumar montos
         // Los montos de turnos ya están incluidos en totalEfectivo/totalTransferencia
         const fechaCaja = cajaData.fecha
         const cajaCreatedAt = cajaData.createdAt ? new Date(cajaData.createdAt) : null
@@ -56,22 +56,26 @@ const Caja = () => {
         const inicioCaja = cajaCreatedAt || new Date(fechaCaja + 'T00:00:00')
         const finCaja = cajaCerradaAt || ahora
 
-        // Filtrar turnos directos que están dentro del rango de tiempo de la caja
+        // Filtrar turnos directos cobrados dentro del rango de tiempo de la caja
         const turnosArray = Array.isArray(turnos) ? turnos : []
         const turnosEnRango = turnosArray.filter((t) => {
-            if (!t || !t.createdAt) return false
-            const fechaTurno = new Date(t.createdAt)
-            return fechaTurno >= inicioCaja && fechaTurno <= finCaja && String(t.estado || '').toLowerCase() !== 'cancelado'
+            if (!t) return false
+            const estado = String(t.estado || '').toLowerCase()
+            if (estado !== 'cobrado') return false
+            const fechaCobro = new Date(t.cobradoAt || t.updatedAt || t.createdAt || 0)
+            return fechaCobro >= inicioCaja && fechaCobro <= finCaja
         })
         const cantidadTurnosDirectos = turnosEnRango.length
 
-        // Contar turnos desde pedidos (producto "Turno Futbol")
+        // Contar turnos desde pedidos cobrados (producto "Turno Futbol")
         const TURNO_PRODUCTO_NOMBRE = 'turno futbol'
         const pedidosArray = Array.isArray(pedidos) ? pedidos : []
         const pedidosEnRango = pedidosArray.filter((p) => {
-            if (!p || !p.createdAt) return false
-            const fechaPedido = new Date(p.createdAt)
-            return fechaPedido >= inicioCaja && fechaPedido <= finCaja && String(p.estado || '').toLowerCase() !== 'cancelado'
+            if (!p) return false
+            const estado = String(p.estado || '').toLowerCase()
+            if (estado !== 'cobrado') return false
+            const fechaCobro = new Date(p.cobradoAt || p.updatedAt || p.createdAt || 0)
+            return fechaCobro >= inicioCaja && fechaCobro <= finCaja
         })
 
         const turnosDesdePedidos = pedidosEnRango.reduce(

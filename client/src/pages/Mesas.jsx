@@ -75,7 +75,7 @@ const Mesas = () => {
             const res = await api.get('/pedidos')
             const fechaHoy = getYMDArgentina(new Date())
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
-            
+
             // Determinar qué fecha usar para filtrar
             const fechaFiltro = fechaCajaSeleccionada || fechaHoy
 
@@ -87,7 +87,7 @@ const Mesas = () => {
                     const fechaPedido = getYMDArgentina(p.createdAt)
                     return fechaPedido === fechaFiltro
                 }
-                
+
                 return false
             })
             setPedidos(pedidosFiltrados)
@@ -107,7 +107,7 @@ const Mesas = () => {
         // Buscar el nombre en nombresPorFecha usando la fecha de la caja seleccionada
         if (mesa.nombresPorFecha) {
             let nombrePorFecha = null
-            
+
             // MongoDB puede devolver Maps como objetos planos
             if (mesa.nombresPorFecha instanceof Map) {
                 nombrePorFecha = mesa.nombresPorFecha.get(fechaFiltro)
@@ -115,7 +115,7 @@ const Mesas = () => {
                 // Acceder directamente como objeto
                 // MongoDB puede devolver el Map como un objeto con claves como strings
                 nombrePorFecha = mesa.nombresPorFecha[fechaFiltro]
-                
+
                 // Si no se encuentra, intentar con diferentes formatos de fecha
                 if (!nombrePorFecha) {
                     // Intentar buscar en todas las claves (por si hay algún problema de formato)
@@ -128,7 +128,7 @@ const Mesas = () => {
                     }
                 }
             }
-            
+
             if (nombrePorFecha && String(nombrePorFecha).trim()) {
                 return String(nombrePorFecha).trim()
             }
@@ -338,10 +338,10 @@ const Mesas = () => {
             // Obtener el nombre de la mesa para la fecha de la caja seleccionada
             // Si no hay nombre para esa fecha, el input estará vacío
             const nombreParaEstaFecha = getNombreMesa(mesa)
-            setFormData({ 
-                numero: mesa.numero, 
+            setFormData({
+                numero: mesa.numero,
                 nombre: nombreParaEstaFecha, // Solo mostrar nombre de la fecha de la caja seleccionada
-                color: mesa.color 
+                color: mesa.color
             })
         } else {
             setFormData({ numero: '', nombre: '', color: '#e11d48' })
@@ -356,7 +356,7 @@ const Mesas = () => {
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
             // Usar la fecha de la caja seleccionada (puede ser hoy o una fecha anterior)
             const fechaFiltro = fechaCajaSeleccionada || fechaHoy
-            
+
             if (editingMesa) {
                 // Incluir la fecha de la caja seleccionada para guardar el nombre asociado a esa fecha
                 await api.put(`/mesas/${editingMesa._id}`, {
@@ -423,7 +423,7 @@ const Mesas = () => {
                 const fechaHoy = getYMDArgentina(new Date())
                 // Obtener la fecha de la caja seleccionada desde localStorage
                 const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
-                
+
                 // Determinar qué fecha usar para filtrar
                 const fechaFiltro = fechaCajaSeleccionada || fechaHoy
 

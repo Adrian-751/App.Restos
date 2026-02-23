@@ -19,7 +19,6 @@ export function formatDateYMD(date, timeZone = process.env.APP_TIMEZONE || 'Amer
   const d = date instanceof Date ? date : new Date(date)
   if (Number.isNaN(d.getTime())) return null
   try {
-    // sv-SE => YYYY-MM-DD
     const fmt = new Intl.DateTimeFormat('sv-SE', {
       timeZone,
       year: 'numeric',
@@ -28,7 +27,6 @@ export function formatDateYMD(date, timeZone = process.env.APP_TIMEZONE || 'Amer
     })
     return fmt.format(d)
   } catch {
-    // Fallback UTC
     return d.toISOString().split('T')[0]
   }
 }

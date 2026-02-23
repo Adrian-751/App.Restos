@@ -210,9 +210,16 @@ export const updateTurno = asyncHandler(async (req, res) => {
         }
     }
 
-        // Si cambió a "Cobrado"
-        if (estadoNuevo?.toLowerCase() === 'cobrado' &&
-            estadoAnterior?.toLowerCase() !== 'cobrado') {
+    const becameCobrado =
+        estadoNuevo?.toLowerCase() === 'cobrado' &&
+        estadoAnterior?.toLowerCase() !== 'cobrado'
+
+    // Si cambió a "Cobrado"
+    if (becameCobrado) {
+        // Fijar cobradoAt una sola vez (si no existe), para poder auditar/filtrar por momento de cobro
+        if (!turno.cobradoAt) {
+            req.body.cobradoAt = new Date()
+        }
 
         const fechaTurnoYMD = formatDateYMD(turno.createdAt)
         const caja = fechaTurnoYMD

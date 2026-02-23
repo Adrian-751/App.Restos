@@ -126,7 +126,7 @@ const main = async () => {
 
     console.log('\n✅ Caja actualizada.\n')
   } finally {
-    await conn.close().catch(() => {})
+    await conn.close().catch(() => { })
   }
 }
 

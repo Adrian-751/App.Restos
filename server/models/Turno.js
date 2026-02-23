@@ -54,6 +54,10 @@ const turnoSchema = new mongoose.Schema({
         default: false
         // Cuando un turno cobrado se elimina de la sección Turnos,
         // se marca como true pero se mantiene para Histórico
+    },
+    cobradoAt: {
+        type: Date,
+        default: null
     }
 }, {
     timestamps: true // createdAt y updatedAt automáticamente

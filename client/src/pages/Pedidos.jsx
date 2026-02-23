@@ -69,10 +69,10 @@ const Pedidos = () => {
         try {
             const res = await api.get('/pedidos')
             const fechaHoy = getYMDArgentina(new Date())
-            
+
             // Obtener la fecha de la caja seleccionada desde localStorage
             const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
-            
+
             // Determinar qué fecha usar para filtrar
             // Si hay fecha de caja seleccionada, usar esa fecha (puede ser hoy o un día anterior)
             // Si NO hay fecha de caja seleccionada, usar la fecha de hoy
@@ -521,9 +521,19 @@ const Pedidos = () => {
                                                 ? `Mesa ${mesa.numero}${mesa.nombre ? ` - ${capitalizeFirst(mesa.nombre)}` : ''}`
                                                 : 'Mesa N/A'
                                         })()
-                                        : (pedido.nombre ? pedido.nombre : 'Sin Mesa')}
+                                        : (() => {
+                                            // Si no hay mesa pero hay cliente, mostrar el cliente como título principal
+                                            if (pedido.clienteId) {
+                                                const clienteNombre =
+                                                    typeof pedido.clienteId === 'object' && pedido.clienteId !== null
+                                                        ? (pedido.clienteId.nombre || 'N/A')
+                                                        : (clientes.find((c) => String(c._id) === String(pedido.clienteId))?.nombre || 'N/A')
+                                                return `Cliente: ${clienteNombre}`
+                                            }
+                                            return (pedido.nombre ? pedido.nombre : 'Sin Mesa')
+                                        })()}
                                 </h3>
-                                {pedido.clienteId && (
+                                {pedido.mesaId && pedido.clienteId && (
                                     <p className="text-sm text-slate-300">
                                         Cliente:{' '}
                                         {typeof pedido.clienteId === 'object' && pedido.clienteId !== null
@@ -833,6 +843,14 @@ const Pedidos = () => {
                                         const nombreMesa = typeof mesa === 'object' ? mesa.nombre : mesa.nombre
                                         return `Mesa ${numero}${nombreMesa ? ` - ${nombreMesa}` : ''}`
                                     }
+                                }
+                                // Si no tiene mesa pero tiene cliente, mostrar el cliente
+                                if (pedidoACobrar.clienteId) {
+                                    const clienteNombre =
+                                        typeof pedidoACobrar.clienteId === 'object' && pedidoACobrar.clienteId !== null
+                                            ? (pedidoACobrar.clienteId.nombre || 'N/A')
+                                            : (clientes.find((c) => String(c._id) === String(pedidoACobrar.clienteId))?.nombre || 'N/A')
+                                    return `Cliente: ${clienteNombre}`
                                 }
                                 // Si no tiene mesa pero tiene nombre, mostrar el nombre
                                 if (pedidoACobrar.nombre) {

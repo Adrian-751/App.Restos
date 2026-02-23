@@ -55,6 +55,10 @@ const pedidoSchema = new mongoose.Schema({
         type: String,
         enum: ['Pendiente', 'Cuenta Corriente', 'Cobrado', 'Cancelado'],
         default: 'Pendiente'
+    },
+    cobradoAt: {
+        type: Date,
+        default: null
     }
 }, {
     timestamps: true
