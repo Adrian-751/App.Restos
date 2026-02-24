@@ -7,11 +7,35 @@ import { formatDateYMD } from '../utils/date.js'
  */
 export const getPedidos = asyncHandler(async (req, res) => {
     const { Pedido } = req.models
-    const pedidos = await Pedido.find()
+    const pendientes =
+        String(req.query?.pendientes || '').toLowerCase() === 'true' ||
+        String(req.query?.pendientes || '') === '1'
+
+    // Para evitar que en producción se vuelva inmanejable traer TODO el histórico,
+    // permitimos pedir solo los pendientes (lo que usa Pedidos/Turnos normalmente).
+    const query = pendientes
+        ? { estado: { $nin: ['Cobrado', 'Cancelado'] } }
+        : {}
+
+    // Solo aplicamos límite cuando se pide "pendientes", para no romper usos existentes.
+    let limit = null
+    if (pendientes) {
+        const raw = Number(req.query?.limit)
+        if (Number.isFinite(raw) && raw > 0) {
+            limit = Math.min(Math.floor(raw), 5000)
+        } else {
+            limit = 2000
+        }
+    }
+
+    let q = Pedido.find(query)
         .populate('mesaId', 'numero nombre')
         .populate('clienteId', 'nombre')
         .sort({ createdAt: -1 });
 
+    if (limit) q = q.limit(limit)
+
+    const pedidos = await q
     res.json(pedidos);
 });
 

@@ -67,7 +67,9 @@ const Pedidos = () => {
 
     const fetchPedidos = async () => {
         try {
-            const res = await api.get('/pedidos')
+            // En producción, traer TODO el histórico puede volverse enorme y hacer que la UI
+            // “parezca” que no se guardan pedidos. Pedimos solo pendientes y filtramos por fecha acá.
+            const res = await api.get('/pedidos?pendientes=true&limit=5000')
             const fechaHoy = getYMDArgentina(new Date())
 
             // Obtener la fecha de la caja seleccionada desde localStorage
@@ -98,7 +100,7 @@ const Pedidos = () => {
             console.error('Error fetching pedidos:', error)
             // En caso de error, intentar mostrar todos los pedidos pendientes
             try {
-                const res = await api.get('/pedidos')
+                const res = await api.get('/pedidos?pendientes=true&limit=5000')
                 const todosPendientes = res.data.filter((p) => {
                     const est = String(p?.estado || '').toLowerCase()
                     return est !== 'cobrado' && est !== 'cancelado'
@@ -167,7 +169,7 @@ const Pedidos = () => {
             if (formData.items?.length) return
             if (!mesaId && !clienteId) return
 
-            const res = await api.get('/pedidos')
+            const res = await api.get('/pedidos?pendientes=true&limit=5000')
             const pedidosArray = Array.isArray(res.data) ? res.data : []
             const candidatos = pedidosArray.filter((p) => {
                 if (!p) return false
@@ -301,7 +303,7 @@ const Pedidos = () => {
             // Si ya existe un pedido pendiente para esa mesa/cliente, agrandar el mismo (no crear otro)
             if (!editingPedido && (payload.mesaId || payload.clienteId)) {
                 try {
-                    const res = await api.get('/pedidos')
+                    const res = await api.get('/pedidos?pendientes=true&limit=5000')
                     const pedidosArray = Array.isArray(res.data) ? res.data : []
                     // Obtener la fecha de la caja seleccionada desde localStorage
                     const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
