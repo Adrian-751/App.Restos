@@ -5,7 +5,7 @@
  */
 
 // IMPORTANT: Bump this when deploying changes to ensure clients drop old cached assets.
-const CACHE_NAME = 'app-restos-v3'
+const CACHE_NAME = 'app-restos-v4'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -39,8 +39,19 @@ self.addEventListener('fetch', (event) => {
   // Solo GET
   if (req.method !== 'GET') return
 
-  // No cachear API
-  if (url.pathname.startsWith('/api/')) return
+  // 1) Nunca cachear requests cross-origin (típico: API en otro dominio)
+  // 2) Nunca cachear API (aunque sea mismo origen)
+  // 3) Nunca cachear JSON (evita listas viejas en producción)
+  const accept = req.headers.get('accept') || ''
+  const isJson = accept.includes('application/json')
+  const isApi = url.pathname.startsWith('/api/') || url.pathname === '/api'
+  const isCrossOrigin = url.origin !== self.location.origin
+
+  if (isCrossOrigin || isApi || isJson) {
+    // Forzar red y evitar cache HTTP (304/ETag) en APIs/listas
+    event.respondWith(fetch(new Request(req, { cache: 'no-store' })))
+    return
+  }
 
   // Navegaciones: network-first con fallback a cache (SPA)
   if (req.mode === 'navigate') {
