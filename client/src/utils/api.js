@@ -36,7 +36,17 @@ const getTenantFromHost = () => {
 
 const api = axios.create({
     // En dev, Vite proxya /api -> http://localhost:3000 (ver vite.config.js)
-    baseURL: import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL || '/api'),
+    baseURL: (() => {
+        if (import.meta.env.DEV) return '/api'
+
+        // En producción lo ideal es setear VITE_API_URL (ej: Render).
+        // Si NO está seteado, usamos un fallback directo al backend para evitar problemas de cache/rewrites del hosting del frontend.
+        // Nota: el multi-tenant igual funciona porque mandamos X-Tenant basado en el hostname del frontend.
+        const envUrl = import.meta.env.VITE_API_URL
+        if (envUrl) return envUrl
+
+        return 'https://app-restos-api.onrender.com/api'
+    })(),
     headers: {
         'Content-Type': 'application/json',
     },
