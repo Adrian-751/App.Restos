@@ -25,7 +25,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://app-restos-api.onrender.com/api/$1"
+      "destination": "https://app-restos-api-d45z.onrender.com/api/$1"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
