@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler.js';
 import { tenantMiddleware } from './tenancy/tenant.js';
 import { attachTenantDb } from './tenancy/attachTenantDb.js';
+import { resolveTenant } from './tenancy/tenant.js';
 
 // Importar rutas
 import authRoutes from './routes/auth.js';
@@ -25,7 +26,13 @@ const app = express();
 // - Permite que req.ip refleje el IP real (X-Forwarded-For)
 // - Evita que rate-limit trate a todos como "la misma IP"
 if (process.env.NODE_ENV === 'production') {
-    app.set('trust proxy', 1)
+    // Default más permisivo: en hosting con múltiples proxies (CDN + Render, etc)
+    // `trust proxy=1` a veces deja a todos con el mismo IP => rate-limit bloquea de golpe.
+    // Se puede ajustar con TRUST_PROXY (true | número).
+    const raw = process.env.TRUST_PROXY
+    if (raw === 'true') app.set('trust proxy', true)
+    else if (raw && !Number.isNaN(Number(raw))) app.set('trust proxy', Number(raw))
+    else app.set('trust proxy', true)
 }
 
 // Middlewares globales
@@ -88,7 +95,12 @@ const limiter = rateLimit({
         error: 'Demasiadas peticiones desde esta IP, intenta más tarde'
     },
     standardHeaders: true, // Retorna info de rate limit en headers
-    legacyHeaders: false
+    legacyHeaders: false,
+    // Evita que un pico de lecturas bloquee el guardado (POST/PUT/DELETE).
+    // Para escrituras preferimos que siempre pasen (y si hay abuso se controla a otro nivel).
+    skip: (req) => req.method !== 'GET',
+    // Incluir tenant en la key para evitar colisiones entre clientes (multi-tenant).
+    keyGenerator: (req) => `${resolveTenant(req)}|${req.ip}`,
 });
 
 // Rate limiting más estricto para autenticación

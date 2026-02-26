@@ -13,6 +13,7 @@ const Pedidos = () => {
     const [clientes, setClientes] = useState([])
     const [showModal, setShowModal] = useState(false)
     const [editingPedido, setEditingPedido] = useState(null)
+    const [isSaving, setIsSaving] = useState(false)
     const [formData, setFormData] = useState({
         nombre: '',
         mesaId: '',
@@ -273,7 +274,9 @@ const Pedidos = () => {
     }
 
     const savePedido = async () => {
+        if (isSaving) return
         try {
+            setIsSaving(true)
             const total = calcularTotal()
             const data = {
                 ...formData,
@@ -371,8 +374,14 @@ const Pedidos = () => {
             setEditingPedido(null)
             fetchPedidos()
         } catch (error) {
-            const errorMsg = error.response?.data?.error || error.message || 'Error al guardar el pedido'
+            const errorMsg =
+                error.userMessage ||
+                error.response?.data?.error ||
+                error.message ||
+                'Error al guardar el pedido'
             toastError(errorMsg)
+        } finally {
+            setIsSaving(false)
         }
     }
 
@@ -814,8 +823,12 @@ const Pedidos = () => {
                             </div>
 
                             <div className="flex flex-col sm:flex-row gap-3">
-                                <button onClick={savePedido} className="btn-primary w-full sm:flex-1">
-                                    Guardar
+                                <button
+                                    onClick={savePedido}
+                                    className="btn-primary w-full sm:flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    disabled={isSaving}
+                                >
+                                    {isSaving ? 'Guardando…' : 'Guardar'}
                                 </button>
                                 <button
                                     onClick={() => { setShowModal(false); setEditingPedido(null) }}

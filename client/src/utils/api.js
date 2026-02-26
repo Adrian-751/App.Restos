@@ -50,6 +50,8 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    // Evita requests "colgadas" infinitamente cuando el backend/DB está caído.
+    timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS) || 15000,
 });
 
 // Interceptor de request: agregar token a cada petición
@@ -78,6 +80,14 @@ api.interceptors.response.use(
         return response;
     },
     (error) => {
+        // Mensajes amigables (para que las pantallas puedan mostrar algo claro)
+        if (error?.code === 'ECONNABORTED') {
+            error.userMessage = 'Tiempo de espera agotado. Revisá la conexión o el servidor e intentá nuevamente.'
+        }
+        if (error?.response?.status === 429) {
+            error.userMessage = error.response?.data?.error || 'Demasiadas peticiones. Esperá un minuto e intentá de nuevo.'
+        }
+
         // Si el error es 401 (no autenticado), eliminar token y redirigir
         if (error.response?.status === 401) {
             localStorage.removeItem('token');

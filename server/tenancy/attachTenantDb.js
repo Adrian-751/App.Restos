@@ -9,7 +9,11 @@ export const attachTenantDb = async (req, res, next) => {
         req.models = getModels(conn)
         next()
     } catch (err) {
-        return res.status(500).json({ error: 'No se pudo conectar a la base de datos del cliente' })
+        console.error('❌ attachTenantDb:', err)
+        return res.status(500).json({
+            error: 'No se pudo conectar a la base de datos del cliente',
+            message: process.env.NODE_ENV === 'development' ? err?.message : undefined,
+        })
     }
 }
 
