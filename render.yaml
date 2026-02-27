@@ -15,6 +15,11 @@ services:
         value: "true"
       - key: RATE_LIMIT_ENABLED
         value: "true"
+      # Express `trust proxy` (Render/Cloudflare/CDN, etc). Options:
+      # - "true" to trust all proxies (recommended when unsure)
+      # - "1", "2", ... number of proxies in front
+      - key: TRUST_PROXY
+        value: "true"
       - key: JWT_EXPIRES_IN
         value: 30d
       # Secrets (se cargan en Render al crear el servicio)
