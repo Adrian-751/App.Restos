@@ -72,25 +72,16 @@ const Mesas = () => {
 
     const fetchPedidos = async () => {
         try {
-            const res = await api.get('/pedidos')
             const fechaHoy = getYMDArgentina(new Date())
-            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
 
             // Determinar qué fecha usar para filtrar
             const fechaFiltro = fechaCajaSeleccionada || fechaHoy
 
-            // Filtrar pedidos por fecha de la caja seleccionada (incluir todos, no solo pendientes)
-            // Esto nos permite obtener el nombre de la mesa desde pedidos cobrados también
-            const pedidosFiltrados = res.data.filter((p) => {
-                // Filtrar por fecha de la caja seleccionada
-                if (p.createdAt) {
-                    const fechaPedido = getYMDArgentina(p.createdAt)
-                    return fechaPedido === fechaFiltro
-                }
-
-                return false
-            })
-            setPedidos(pedidosFiltrados)
+            // Pedir solo la fecha que necesitamos (evita traer histórico completo)
+            const res = await api.get(`/pedidos?fecha=${encodeURIComponent(fechaFiltro)}`)
+            setPedidos(Array.isArray(res.data) ? res.data : [])
         } catch (error) {
             console.error('Error fetching pedidos:', error)
         }
@@ -100,7 +91,8 @@ const Mesas = () => {
     // Busca el nombre en nombresPorFecha de la mesa usando la fecha de la caja seleccionada
     const getNombreMesa = (mesa) => {
         const fechaHoy = getYMDArgentina(new Date())
-        const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+        const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+        const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
         // Usar la fecha de la caja seleccionada (puede ser hoy o una fecha anterior)
         const fechaFiltro = fechaCajaSeleccionada || fechaHoy
 
@@ -353,7 +345,8 @@ const Mesas = () => {
     const saveMesa = async () => {
         try {
             const fechaHoy = getYMDArgentina(new Date())
-            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
             // Usar la fecha de la caja seleccionada (puede ser hoy o una fecha anterior)
             const fechaFiltro = fechaCajaSeleccionada || fechaHoy
 
@@ -422,7 +415,8 @@ const Mesas = () => {
                 const pedidosArray = Array.isArray(res.data) ? res.data : []
                 const fechaHoy = getYMDArgentina(new Date())
                 // Obtener la fecha de la caja seleccionada desde localStorage
-                const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+                const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+                const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
 
                 // Determinar qué fecha usar para filtrar
                 const fechaFiltro = fechaCajaSeleccionada || fechaHoy
@@ -568,7 +562,8 @@ const Mesas = () => {
             }
 
             // Agregar fecha de la caja seleccionada si existe (solo al crear, no al editar)
-            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
             if (fechaCajaSeleccionada && !editingPedidoId) {
                 payload.fecha = fechaCajaSeleccionada
             }

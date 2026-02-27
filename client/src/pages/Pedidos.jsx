@@ -68,45 +68,27 @@ const Pedidos = () => {
 
     const fetchPedidos = async () => {
         try {
-            // En producción, traer TODO el histórico puede volverse enorme y hacer que la UI
-            // “parezca” que no se guardan pedidos. Pedimos solo pendientes y filtramos por fecha acá.
-            const res = await api.get('/pedidos?pendientes=true&limit=5000')
             const fechaHoy = getYMDArgentina(new Date())
 
             // Obtener la fecha de la caja seleccionada desde localStorage
-            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
 
             // Determinar qué fecha usar para filtrar
             // Si hay fecha de caja seleccionada, usar esa fecha (puede ser hoy o un día anterior)
             // Si NO hay fecha de caja seleccionada, usar la fecha de hoy
             const fechaFiltro = fechaCajaSeleccionada || fechaHoy
 
-            // Filtrar pedidos: solo mostrar los NO cobrados de la fecha de la caja seleccionada
-            const pedidosFiltrados = res.data.filter((p) => {
-                const est = String(p?.estado || '').toLowerCase()
-                // Excluir solo los cobrados y cancelados
-                if (est === 'cobrado' || est === 'cancelado') return false
-
-                // Filtrar por fecha de la caja seleccionada
-                if (p.createdAt) {
-                    const fechaPedido = getYMDArgentina(p.createdAt)
-                    return fechaPedido === fechaFiltro
-                }
-
-                // Si no tiene createdAt, no mostrarlo
-                return false
-            })
-            setPedidos(pedidosFiltrados)
+            // En producción, traer TODO el histórico puede volverse enorme y hacer que la UI
+            // “parezca” que no se guardan pedidos. Pedimos solo pendientes Y de la fecha de la caja.
+            const res = await api.get(`/pedidos?pendientes=true&limit=5000&fecha=${encodeURIComponent(fechaFiltro)}`)
+            setPedidos(Array.isArray(res.data) ? res.data : [])
         } catch (error) {
             console.error('Error fetching pedidos:', error)
             // En caso de error, intentar mostrar todos los pedidos pendientes
             try {
                 const res = await api.get('/pedidos?pendientes=true&limit=5000')
-                const todosPendientes = res.data.filter((p) => {
-                    const est = String(p?.estado || '').toLowerCase()
-                    return est !== 'cobrado' && est !== 'cancelado'
-                })
-                setPedidos(todosPendientes)
+                setPedidos(Array.isArray(res.data) ? res.data : [])
             } catch (err) {
                 console.error('Error en fallback:', err)
             }
@@ -170,7 +152,11 @@ const Pedidos = () => {
             if (formData.items?.length) return
             if (!mesaId && !clienteId) return
 
-            const res = await api.get('/pedidos?pendientes=true&limit=5000')
+            const fechaHoy = getYMDArgentina(new Date())
+            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
+            const fechaFiltro = fechaCajaSeleccionada || fechaHoy
+            const res = await api.get(`/pedidos?pendientes=true&limit=5000&fecha=${encodeURIComponent(fechaFiltro)}`)
             const pedidosArray = Array.isArray(res.data) ? res.data : []
             const candidatos = pedidosArray.filter((p) => {
                 if (!p) return false
@@ -306,21 +292,17 @@ const Pedidos = () => {
             // Si ya existe un pedido pendiente para esa mesa/cliente, agrandar el mismo (no crear otro)
             if (!editingPedido && (payload.mesaId || payload.clienteId)) {
                 try {
-                    const res = await api.get('/pedidos?pendientes=true&limit=5000')
+                    const fechaHoy = getYMDArgentina(new Date())
+                    const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+                    const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
+                    const fechaFiltro = fechaCajaSeleccionada || fechaHoy
+                    const res = await api.get(`/pedidos?pendientes=true&limit=5000&fecha=${encodeURIComponent(fechaFiltro)}`)
                     const pedidosArray = Array.isArray(res.data) ? res.data : []
-                    // Obtener la fecha de la caja seleccionada desde localStorage
-                    const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
 
                     const candidatos = pedidosArray.filter((p) => {
                         if (!p) return false
                         const est = String(p.estado || '').toLowerCase()
                         if (est === 'cobrado' || est === 'cancelado') return false
-
-                        // Si hay una fecha de caja seleccionada, filtrar por esa fecha
-                        if (fechaCajaSeleccionada && p.createdAt) {
-                            const fechaPedido = getYMDArgentina(p.createdAt)
-                            if (fechaPedido !== fechaCajaSeleccionada) return false
-                        }
 
                         if (payload.mesaId) {
                             const mid = typeof p.mesaId === 'object' && p.mesaId !== null ? p.mesaId._id : p.mesaId
@@ -362,7 +344,8 @@ const Pedidos = () => {
             }
 
             // Agregar fecha de la caja seleccionada si existe
-            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
             if (fechaCajaSeleccionada && !editingPedido) {
                 payload.fecha = fechaCajaSeleccionada
             }

@@ -5,7 +5,7 @@
  */
 
 // IMPORTANT: Bump this when deploying changes to ensure clients drop old cached assets.
-const CACHE_NAME = 'app-restos-v5'
+const CACHE_NAME = 'app-restos-v7'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

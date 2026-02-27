@@ -129,8 +129,8 @@ const Caja = () => {
                 const cajaActualizada = cajasAbiertasArray.find(c => c._id === caja._id)
                 if (cajaActualizada) {
                     cajaAMostrar = cajaActualizada
-                    localStorage.setItem('cajaSeleccionadaId', cajaActualizada._id)
-                    localStorage.setItem('cajaSeleccionadaFecha', cajaActualizada.fecha)
+                    localStorage.setItem('cajaSeleccionadaId', String(cajaActualizada._id || '').trim())
+                    localStorage.setItem('cajaSeleccionadaFecha', String(cajaActualizada.fecha || '').trim())
                 }
             }
 
@@ -139,7 +139,7 @@ const Caja = () => {
                 const cajaGuardada = cajasAbiertasArray.find(c => c._id === cajaSeleccionadaId)
                 if (cajaGuardada) {
                     cajaAMostrar = cajaGuardada
-                    localStorage.setItem('cajaSeleccionadaFecha', cajaGuardada.fecha)
+                    localStorage.setItem('cajaSeleccionadaFecha', String(cajaGuardada.fecha || '').trim())
                 } else {
                     // La caja guardada ya no está abierta, limpiar localStorage
                     localStorage.removeItem('cajaSeleccionadaId')
@@ -151,8 +151,8 @@ const Caja = () => {
             if (!cajaAMostrar) {
                 cajaAMostrar = cajaRes.data || cajasAbiertasArray[0] || null
                 if (cajaAMostrar) {
-                    localStorage.setItem('cajaSeleccionadaId', cajaAMostrar._id)
-                    localStorage.setItem('cajaSeleccionadaFecha', cajaAMostrar.fecha)
+                    localStorage.setItem('cajaSeleccionadaId', String(cajaAMostrar._id || '').trim())
+                    localStorage.setItem('cajaSeleccionadaFecha', String(cajaAMostrar.fecha || '').trim())
                 } else {
                     // No hay cajas abiertas, limpiar localStorage
                     localStorage.removeItem('cajaSeleccionadaId')

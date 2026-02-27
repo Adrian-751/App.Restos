@@ -522,7 +522,8 @@ const Clientes = () => {
             // Crear un nuevo pedido con todos los items combinados
             // El backend automáticamente sumará el totalNuevo a la cuenta corriente
             if (editPedidosFormData.items.length > 0) {
-                const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+                const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+                const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
                 await api.post('/pedidos', {
                     clienteId: clienteEditandoPedidos._id,
                     items: editPedidosFormData.items,
@@ -553,7 +554,8 @@ const Clientes = () => {
 
         try {
             const total = calcularTotalPedido()
-            const fechaCajaSeleccionada = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
             await api.post('/pedidos', {
                 clienteId: pedidoFormData.clienteId,
                 items: pedidoFormData.items,

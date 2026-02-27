@@ -11,11 +11,23 @@ export const getPedidos = asyncHandler(async (req, res) => {
         String(req.query?.pendientes || '').toLowerCase() === 'true' ||
         String(req.query?.pendientes || '') === '1'
 
-    // Para evitar que en producción se vuelva inmanejable traer TODO el histórico,
-    // permitimos pedir solo los pendientes (lo que usa Pedidos/Turnos normalmente).
-    const query = pendientes
-        ? { estado: { $nin: ['Cobrado', 'Cancelado'] } }
-        : {}
+    const query = {}
+    // Si se pide pendientes, excluir cobrados/cancelados
+    if (pendientes) {
+        query.estado = { $nin: ['Cobrado', 'Cancelado'] }
+    }
+
+    // Filtro opcional por fecha (YYYY-MM-DD) en timezone Argentina.
+    // Esto evita bajar miles de pedidos y filtrar en el frontend.
+    const fechaRaw = req.query?.fecha
+    const fecha = typeof fechaRaw === 'string' ? fechaRaw.trim() : ''
+    if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+        const start = new Date(`${fecha}T00:00:00.000${getArgentinaOffset()}`)
+        const end = new Date(`${fecha}T23:59:59.999${getArgentinaOffset()}`)
+        if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+            query.createdAt = { $gte: start, $lte: end }
+        }
+    }
 
     // Solo aplicamos límite cuando se pide "pendientes", para no romper usos existentes.
     let limit = null
