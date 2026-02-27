@@ -1,5 +1,5 @@
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { formatDateYMD } from '../utils/date.js'
+import { formatDateYMD, getArgentinaOffset, getTimeHMS } from '../utils/date.js'
 
 
 /* Obtener todos los pedidos
@@ -64,11 +64,12 @@ export const createPedido = asyncHandler(async (req, res) => {
     // Si se proporciona una fecha, convertirla a Date para createdAt
     let createdAt = undefined
     if (fecha) {
-        // La fecha viene en formato YYYY-MM-DD. Mantener esa fecha, pero conservar la hora actual local
-        // (evita que en Histórico aparezcan siempre 12:00).
-        const now = new Date()
-        const hhmmss = now.toTimeString().slice(0, 8)
-        const fechaDate = new Date(`${fecha}T${hhmmss}`)
+        // La fecha viene en formato YYYY-MM-DD.
+        // IMPORTANTE: el server en Render suele correr en UTC. Si armamos `${fecha}T${hhmmss}` sin offset,
+        // el pedido puede "cambiar de día" al verlo en Argentina y la UI lo filtra como si no se hubiera guardado.
+        // Por eso construimos el Date con hora Argentina + offset explícito -03:00.
+        const hhmmss = getTimeHMS(new Date())
+        const fechaDate = new Date(`${fecha}T${hhmmss}${getArgentinaOffset()}`)
         if (!isNaN(fechaDate.getTime())) {
             createdAt = fechaDate
         }

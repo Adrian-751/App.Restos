@@ -1,5 +1,5 @@
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { formatDateYMD } from '../utils/date.js'
+import { formatDateYMD, getArgentinaOffset, getTimeHMS } from '../utils/date.js'
 
 /**
  * Obtener todos los turnos (excluyendo los eliminados de la sección Turnos)
@@ -115,9 +115,8 @@ export const createTurno = asyncHandler(async (req, res) => {
 
     // Si hay fecha personalizada, establecer createdAt
     if (fecha) {
-        const now = new Date()
-        const hhmmss = now.toTimeString().slice(0, 8)
-        const fechaDate = new Date(`${fecha}T${hhmmss}`)
+        const hhmmss = getTimeHMS(new Date())
+        const fechaDate = new Date(`${fecha}T${hhmmss}${getArgentinaOffset()}`)
         if (!isNaN(fechaDate.getTime())) {
             turnoData.createdAt = fechaDate
             turnoData.updatedAt = fechaDate
