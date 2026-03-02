@@ -8,10 +8,9 @@ const Panel = () => {
 
     const fetchStats = async () => {
         try {
-            const [caja, mesas, pedidos, cajasHoy, turnos] = await Promise.all([
+            const [caja, mesas, cajasHoy, turnos] = await Promise.all([
                 api.get('/caja/estado').catch(() => ({ data: null })),
                 api.get('/mesas').catch(() => ({ data: [] })),
-                api.get('/pedidos').catch(() => ({ data: [] })),
                 api.get('/caja/resumen').catch(() => ({ data: [] })),
                 api.get('/turnos').catch(() => ({ data: [] })),
             ])
@@ -20,6 +19,25 @@ const Panel = () => {
             const hoy = getYMDArgentina(new Date());
             const cajasHoyArray = Array.isArray(cajasHoy.data) ? cajasHoy.data : []
             const cajaHoy = caja.data || cajasHoyArray.find(c => c.fecha === hoy);
+
+            // Pedidos pendientes: solo de la caja actual ABIERTA (por fecha). Si no hay caja abierta, 0.
+            let pedidosPendientes = 0;
+            const cajaAbierta = caja.data;
+            const fechaCajaActual = cajaAbierta?.fecha ? String(cajaAbierta.fecha).split('T')[0] : null;
+
+            // Pedidos: hoy para turnos; fechaCajaActual para pendientes (cuando hay caja)
+            const pedidosHoyRes = await api.get(`/pedidos?fecha=${encodeURIComponent(hoy)}`).catch(() => ({ data: [] }));
+            const pedidosHoy = Array.isArray(pedidosHoyRes.data) ? pedidosHoyRes.data : [];
+
+            if (fechaCajaActual) {
+                if (fechaCajaActual === hoy) {
+                    pedidosPendientes = pedidosHoy.filter((p) => String(p.estado || '').toLowerCase() === 'pendiente').length;
+                } else {
+                    const pedidosCajaRes = await api.get(`/pedidos?pendientes=true&fecha=${encodeURIComponent(fechaCajaActual)}`).catch(() => ({ data: [] }));
+                    const pedidosCaja = Array.isArray(pedidosCajaRes.data) ? pedidosCajaRes.data : [];
+                    pedidosPendientes = pedidosCaja.filter((p) => String(p.estado || '').toLowerCase() === 'pendiente').length;
+                }
+            }
 
             // Calcular el total del día (solo facturación)
             const totalDia = cajaHoy
@@ -56,12 +74,11 @@ const Panel = () => {
             }
 
             const mesasArray = Array.isArray(mesas.data) ? mesas.data : []
-            const pedidosArray = Array.isArray(pedidos.data) ? pedidos.data : []
 
             // También permitir contar "turnos" vendidos como producto desde Pedidos,
             // pero SOLO si el producto se llama "Turno Futbol".
             const TURNO_PRODUCTO_NOMBRE = 'turno futbol'
-            const pedidosCobradosHoy = pedidosArray.filter((p) => {
+            const pedidosCobradosHoy = pedidosHoy.filter((p) => {
                 if (!p || !p.createdAt) return false
                 const fechaPedido = getYMDArgentina(p.createdAt)
                 return fechaPedido === hoy && String(p.estado || '').toLowerCase() === 'cobrado'
@@ -92,7 +109,7 @@ const Panel = () => {
                 cajaAbierta: !!caja.data,
                 mesasOcupadas: mesasArray.filter((m) => m.estado === 'ocupada').length,
                 mesasReservadas: mesasArray.filter((m) => m.estado === 'reservada').length,
-                pedidosPendientes: pedidosArray.filter((p) => p.estado === 'Pendiente').length,
+                pedidosPendientes,
                 totalHoy: totalDia,
                 montoCajaCerrada: montoCajaCerrada,
                 turnosHoy: { cantidad: cantidadTurnos, total: totalTurnos },
