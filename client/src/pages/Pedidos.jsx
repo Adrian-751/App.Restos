@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import api from '../utils/api'
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
 import { toastError, toastInfo, toastSuccess } from '../utils/toast'
@@ -14,6 +14,7 @@ const Pedidos = () => {
     const [showModal, setShowModal] = useState(false)
     const [editingPedido, setEditingPedido] = useState(null)
     const [isSaving, setIsSaving] = useState(false)
+    const savingRef = useRef(false)
     const [formData, setFormData] = useState({
         nombre: '',
         mesaId: '',
@@ -66,32 +67,20 @@ const Pedidos = () => {
         }
     }, [])
 
+    const getFechaFiltroCaja = () => {
+        const raw = localStorage.getItem('cajaSeleccionadaFecha')
+        return String(raw || '').trim() || getYMDArgentina(new Date())
+    }
+
     const fetchPedidos = async () => {
         try {
-            const fechaHoy = getYMDArgentina(new Date())
+            const fechaFiltro = getFechaFiltroCaja()
 
-            // Obtener la fecha de la caja seleccionada desde localStorage
-            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
-            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
-
-            // Determinar qué fecha usar para filtrar
-            // Si hay fecha de caja seleccionada, usar esa fecha (puede ser hoy o un día anterior)
-            // Si NO hay fecha de caja seleccionada, usar la fecha de hoy
-            const fechaFiltro = fechaCajaSeleccionada || fechaHoy
-
-            // En producción, traer TODO el histórico puede volverse enorme y hacer que la UI
-            // “parezca” que no se guardan pedidos. Pedimos solo pendientes Y de la fecha de la caja.
             const res = await api.get(`/pedidos?pendientes=true&limit=5000&fecha=${encodeURIComponent(fechaFiltro)}`)
             setPedidos(Array.isArray(res.data) ? res.data : [])
         } catch (error) {
             console.error('Error fetching pedidos:', error)
-            // En caso de error, intentar mostrar todos los pedidos pendientes
-            try {
-                const res = await api.get('/pedidos?pendientes=true&limit=5000')
-                setPedidos(Array.isArray(res.data) ? res.data : [])
-            } catch (err) {
-                console.error('Error en fallback:', err)
-            }
+            setPedidos([])
         }
     }
 
@@ -152,10 +141,7 @@ const Pedidos = () => {
             if (formData.items?.length) return
             if (!mesaId && !clienteId) return
 
-            const fechaHoy = getYMDArgentina(new Date())
-            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
-            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
-            const fechaFiltro = fechaCajaSeleccionada || fechaHoy
+            const fechaFiltro = getFechaFiltroCaja()
             const res = await api.get(`/pedidos?pendientes=true&limit=5000&fecha=${encodeURIComponent(fechaFiltro)}`)
             const pedidosArray = Array.isArray(res.data) ? res.data : []
             const candidatos = pedidosArray.filter((p) => {
@@ -260,16 +246,16 @@ const Pedidos = () => {
     }
 
     const savePedido = async () => {
-        if (isSaving) return
+        if (savingRef.current) return
+        savingRef.current = true
+        setIsSaving(true)
         try {
-            setIsSaving(true)
             const total = calcularTotal()
             const data = {
                 ...formData,
                 total,
             }
 
-            // Si hay una mesa seleccionada, actualizar su estado a "ocupada"
             if (formData.mesaId) {
                 try {
                     await api.put(`/mesas/${formData.mesaId}`, {
@@ -289,13 +275,9 @@ const Pedidos = () => {
                 ...(data.clienteId ? { estado: 'Cuenta Corriente' } : {}),
             }
 
-            // Si ya existe un pedido pendiente para esa mesa/cliente, agrandar el mismo (no crear otro)
             if (!editingPedido && (payload.mesaId || payload.clienteId)) {
                 try {
-                    const fechaHoy = getYMDArgentina(new Date())
-                    const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
-                    const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
-                    const fechaFiltro = fechaCajaSeleccionada || fechaHoy
+                    const fechaFiltro = getFechaFiltroCaja()
                     const res = await api.get(`/pedidos?pendientes=true&limit=5000&fecha=${encodeURIComponent(fechaFiltro)}`)
                     const pedidosArray = Array.isArray(res.data) ? res.data : []
 
@@ -335,19 +317,17 @@ const Pedidos = () => {
                         setShowModal(false)
                         setEditingPedido(null)
                         fetchPedidos()
+                        toastSuccess('Pedido guardado')
                         return
                     }
                 } catch (e) {
-                    // si falla la búsqueda, seguimos con create normal
                     console.error('Error buscando pedido existente:', e)
                 }
             }
 
-            // Agregar fecha de la caja seleccionada si existe
-            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
-            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
-            if (fechaCajaSeleccionada && !editingPedido) {
-                payload.fecha = fechaCajaSeleccionada
+            const fechaCaja = getFechaFiltroCaja()
+            if (fechaCaja && !editingPedido) {
+                payload.fecha = fechaCaja
             }
 
             if (editingPedido) await api.put(`/pedidos/${editingPedido._id}`, payload)
@@ -356,6 +336,7 @@ const Pedidos = () => {
             setShowModal(false)
             setEditingPedido(null)
             fetchPedidos()
+            toastSuccess('Pedido guardado')
         } catch (error) {
             const errorMsg =
                 error.userMessage ||
@@ -364,6 +345,7 @@ const Pedidos = () => {
                 'Error al guardar el pedido'
             toastError(errorMsg)
         } finally {
+            savingRef.current = false
             setIsSaving(false)
         }
     }

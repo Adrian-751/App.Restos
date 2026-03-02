@@ -1,10 +1,19 @@
 {
-    "name": "app-restos",
-    "version": "1.0.0",
-    "description": "Sistema de gestión para canchas de fútbol y restaurantes",
-    "private": true,
-    "workspaces": [
-        "client",
-        "server"
-    ]
+  "name": "app-restos",
+  "version": "1.0.0",
+  "description": "Sistema de gestión para canchas de fútbol y restaurantes",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.3.3"
+  },
+  "scripts": {
+    "test:e2e": "npx playwright test e2e/",
+    "test:e2e:headed": "npx playwright test e2e/ --headed",
+    "test:e2e:debug": "npx playwright test e2e/ --debug"
+  }
 }
