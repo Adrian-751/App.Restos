@@ -245,7 +245,7 @@ const Pedidos = () => {
         return total
     }
 
-    const savePedido = async () => {
+    const savePedido = async (abrirCobro = false) => {
         if (savingRef.current) return
         savingRef.current = true
         setIsSaving(true)
@@ -306,19 +306,23 @@ const Pedidos = () => {
                             (sum, it) => sum + (Number(it?.precio || 0) * Number(it?.cantidad || 0)),
                             0
                         )
-                        await api.put(`/pedidos/${existente._id}`, {
-                            nombre: payload.nombre?.trim() ? payload.nombre : (existente.nombre || ''),
-                            mesaId: payload.mesaId || null,
-                            clienteId: payload.clienteId || null,
-                            items: mergedItems,
-                            total: mergedTotal,
-                            ...(payload.clienteId ? { estado: 'Cuenta Corriente' } : {}),
-                        })
-                        setShowModal(false)
-                        setEditingPedido(null)
-                        fetchPedidos()
+                    const mergeRes = await api.put(`/pedidos/${existente._id}`, {
+                        nombre: payload.nombre?.trim() ? payload.nombre : (existente.nombre || ''),
+                        mesaId: payload.mesaId || null,
+                        clienteId: payload.clienteId || null,
+                        items: mergedItems,
+                        total: mergedTotal,
+                        ...(payload.clienteId ? { estado: 'Cuenta Corriente' } : {}),
+                    })
+                    setShowModal(false)
+                    setEditingPedido(null)
+                    fetchPedidos()
+                    if (abrirCobro) {
+                        cobrarPedido(mergeRes.data || { ...existente, items: mergedItems, total: mergedTotal, _id: existente._id, efectivo: 0, transferencia: 0 })
+                    } else {
                         toastSuccess('Pedido guardado')
-                        return
+                    }
+                    return
                     }
                 } catch (e) {
                     console.error('Error buscando pedido existente:', e)
@@ -330,13 +334,18 @@ const Pedidos = () => {
                 payload.fecha = fechaCaja
             }
 
-            if (editingPedido) await api.put(`/pedidos/${editingPedido._id}`, payload)
-            else await api.post('/pedidos', payload)
+            let saveRes
+            if (editingPedido) saveRes = await api.put(`/pedidos/${editingPedido._id}`, payload)
+            else saveRes = await api.post('/pedidos', payload)
 
             setShowModal(false)
             setEditingPedido(null)
             fetchPedidos()
-            toastSuccess('Pedido guardado')
+            if (abrirCobro && saveRes?.data) {
+                cobrarPedido(saveRes.data)
+            } else {
+                toastSuccess('Pedido guardado')
+            }
         } catch (error) {
             const errorMsg =
                 error.userMessage ||
@@ -789,11 +798,18 @@ const Pedidos = () => {
 
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <button
-                                    onClick={savePedido}
+                                    onClick={() => savePedido(false)}
                                     className="btn-primary w-full sm:flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
                                     disabled={isSaving}
                                 >
                                     {isSaving ? 'Guardando…' : 'Guardar'}
+                                </button>
+                                <button
+                                    onClick={() => savePedido(true)}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors w-full sm:flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    disabled={isSaving}
+                                >
+                                    {isSaving ? 'Guardando…' : 'Cobrar'}
                                 </button>
                                 <button
                                     onClick={() => { setShowModal(false); setEditingPedido(null) }}
