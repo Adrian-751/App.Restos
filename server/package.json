@@ -8,7 +8,12 @@
         "start": "node index.js",
         "dev": "nodemon index.js",
         "create-admin": "node scripts/createAdmin.js",
-        "reset-tenant": "node scripts/resetTenant.js"
+        "reset-tenant": "node scripts/resetTenant.js",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "test:unit": "vitest run tests/unit",
+        "test:integration": "vitest run tests/integration"
     },
     "keywords": [],
     "author": "",
@@ -28,6 +33,9 @@
         "@types/bcryptjs": "^2.4.6",
         "@types/jsonwebtoken": "^9.0.10",
         "@types/uuid": "^10.0.0",
-        "nodemon": "^3.0.1"
+        "mongodb-memory-server": "^11.0.1",
+        "nodemon": "^3.0.1",
+        "supertest": "^7.2.2",
+        "vitest": "^4.0.18"
     }
 }

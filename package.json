@@ -12,8 +12,13 @@
     "@types/node": "^25.3.3"
   },
   "scripts": {
+    "test": "npm run test:server && npm run test:client",
+    "test:server": "npm run test --workspace=server",
+    "test:client": "npm run test --workspace=client",
     "test:e2e": "npx playwright test e2e/",
+    "test:e2e:full": "npx playwright test e2e/full-app.spec.mjs",
     "test:e2e:headed": "npx playwright test e2e/ --headed",
-    "test:e2e:debug": "npx playwright test e2e/ --debug"
+    "test:e2e:debug": "npx playwright test e2e/ --debug",
+    "test:all": "npm run test && npm run test:e2e"
   }
 }
