@@ -18,11 +18,22 @@ export const getPedidos = asyncHandler(async (req, res) => {
     }
 
     // Filtro opcional por fecha (YYYY-MM-DD) en timezone Argentina.
-    // Usamos $dateToString en aggregation para que coincida con la fecha local de Argentina,
-    // evitando problemas cuando el servidor corre en UTC y los pedidos tienen createdAt en UTC.
+    // Rango: fecha 00:00 hasta (fecha+1) 05:59 para incluir turno nocturno (caja hasta 1-2am).
     const fechaRaw = req.query?.fecha
     const fecha = typeof fechaRaw === 'string' ? fechaRaw.trim() : ''
-    const useFechaFilter = /^\d{4}-\d{2}-\d{2}$/.test(fecha)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+        const start = new Date(`${fecha}T00:00:00.000${getArgentinaOffset()}`)
+        const end = new Date(`${fecha}T23:59:59.999${getArgentinaOffset()}`)
+        const [y, m, d] = fecha.split('-').map(Number)
+        const nextDay = new Date(y, m - 1, d + 1)
+        const endNextDay = new Date(`${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}T05:59:59.999${getArgentinaOffset()}`)
+        if (!Number.isNaN(start.getTime()) && !Number.isNaN(endNextDay.getTime())) {
+            query.$or = [
+                { createdAt: { $gte: start, $lte: end } },
+                { createdAt: { $gte: new Date(`${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}T00:00:00.000${getArgentinaOffset()}`), $lte: endNextDay } }
+            ]
+        }
+    }
 
     let limit = null
     if (pendientes) {
@@ -34,47 +45,12 @@ export const getPedidos = asyncHandler(async (req, res) => {
         }
     }
 
-    let pedidos
-    if (useFechaFilter) {
-        // Incluir también pedidos de 00:00 a 05:59 del día siguiente (turno nocturno: caja abierta hasta 1-2am)
-        const [y, m, d] = fecha.split('-').map(Number)
-        const nextDay = new Date(y, m - 1, d + 1)
-        const nextDayFecha = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`
-
-        const pipeline = [
-            { $match: query },
-            { $match: { $expr: { $or: [
-                { $eq: [
-                    { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'America/Argentina/Buenos_Aires' } },
-                    fecha
-                ]},
-                { $and: [
-                    { $eq: [
-                        { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'America/Argentina/Buenos_Aires' } },
-                        nextDayFecha
-                    ]},
-                    { $lt: [
-                        { $toInt: { $dateToString: { format: '%H', date: '$createdAt', timezone: 'America/Argentina/Buenos_Aires' } } },
-                        6
-                    ]}
-                ]}
-            ]}}},
-            { $sort: { createdAt: -1 } },
-            ...(limit ? [{ $limit: limit }] : []),
-            { $lookup: { from: 'mesas', localField: 'mesaId', foreignField: '_id', as: 'mesaId' } },
-            { $unwind: { path: '$mesaId', preserveNullAndEmptyArrays: true } },
-            { $lookup: { from: 'clientes', localField: 'clienteId', foreignField: '_id', as: 'clienteId' } },
-            { $unwind: { path: '$clienteId', preserveNullAndEmptyArrays: true } }
-        ]
-        pedidos = await Pedido.aggregate(pipeline)
-    } else {
-        let q = Pedido.find(query)
-            .populate('mesaId', 'numero nombre')
-            .populate('clienteId', 'nombre')
-            .sort({ createdAt: -1 })
-        if (limit) q = q.limit(limit)
-        pedidos = await q
-    }
+    let q = Pedido.find(query)
+        .populate('mesaId', 'numero nombre')
+        .populate('clienteId', 'nombre')
+        .sort({ createdAt: -1 })
+    if (limit) q = q.limit(limit)
+    const pedidos = await q
     res.json(pedidos);
 });
 

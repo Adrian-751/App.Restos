@@ -14,6 +14,7 @@ const Pedidos = () => {
     const [showModal, setShowModal] = useState(false)
     const [editingPedido, setEditingPedido] = useState(null)
     const [isSaving, setIsSaving] = useState(false)
+    const [saveMode, setSaveMode] = useState('guardar') // 'guardar' | 'cobrar'
     const savingRef = useRef(false)
     const [formData, setFormData] = useState({
         nombre: '',
@@ -247,6 +248,7 @@ const Pedidos = () => {
     const savePedido = async (abrirCobro = false) => {
         if (savingRef.current) return
         savingRef.current = true
+        setSaveMode(abrirCobro ? 'cobrar' : 'guardar')
         setIsSaving(true)
         try {
             const total = calcularTotal()
@@ -792,14 +794,14 @@ const Pedidos = () => {
                                     className="btn-primary w-full sm:flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
                                     disabled={isSaving}
                                 >
-                                    {isSaving ? 'Guardando…' : 'Guardar'}
+                                    {isSaving && saveMode === 'guardar' ? 'Guardando…' : 'Guardar'}
                                 </button>
                                 <button
                                     onClick={() => savePedido(true)}
                                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors w-full sm:flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
                                     disabled={isSaving}
                                 >
-                                    {isSaving ? 'Guardando…' : 'Cobrar'}
+                                    {isSaving && saveMode === 'cobrar' ? 'Guardando…' : 'Cobrar'}
                                 </button>
                                 <button
                                     onClick={() => { setShowModal(false); setEditingPedido(null) }}
