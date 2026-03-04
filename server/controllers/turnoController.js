@@ -169,85 +169,73 @@ export const updateTurno = asyncHandler(async (req, res) => {
         return res.status(404).json({ error: 'Turno no encontrado' });
     }
 
-    const estadoAnterior = turno.estado;
-    const estadoNuevo = req.body.estado;
-
-    // 1) Caja: sumar pagos parciales (delta efectivo/transferencia) aunque NO esté Cobrado
-    {
-        const prevE = parseFloat(turno.efectivo) || 0
-        const prevT = parseFloat(turno.transferencia) || 0
-        const nextE = req.body.efectivo != null ? (parseFloat(req.body.efectivo) || 0) : prevE
-        const nextT = req.body.transferencia != null ? (parseFloat(req.body.transferencia) || 0) : prevT
-        const deltaE = nextE - prevE
-        const deltaT = nextT - prevT
-
-        if (deltaE !== 0 || deltaT !== 0) {
-            // Buscar caja abierta de la MISMA fecha del turno (soporta caja anterior)
-            const fechaTurnoYMD = formatDateYMD(turno.createdAt)
-            const caja = fechaTurnoYMD
-                ? await Caja.findOne({ fecha: fechaTurnoYMD, cerrada: false }).sort({ createdAt: -1 })
-                : null
-
-            if (caja) {
-                caja.totalEfectivo = (caja.totalEfectivo || 0) + deltaE
-                caja.totalTransferencia = (caja.totalTransferencia || 0) + deltaT
-                if (caja.totalEfectivo < 0) caja.totalEfectivo = 0
-                if (caja.totalTransferencia < 0) caja.totalTransferencia = 0
-
-                if (!caja.ventas) caja.ventas = []
-                caja.ventas.push({
-                    turnoId: turno._id.toString(),
-                    tipo: 'turno',
-                    total: (deltaE + deltaT),
-                    efectivo: deltaE,
-                    transferencia: deltaT,
-                    fecha: new Date()
-                })
-
-                await caja.save()
-            }
-        }
+    // Sanitizar body: descartar campos internos y normalizar objetos poblados
+    const body = { ...req.body }
+    delete body._id
+    delete body.__v
+    delete body.createdAt
+    delete body.updatedAt
+    delete body.id
+    if (body.pedidoId && typeof body.pedidoId === 'object') {
+        body.pedidoId = body.pedidoId._id ? body.pedidoId._id.toString() : null
     }
+    if (body.mesaId && typeof body.mesaId === 'object') {
+        body.mesaId = body.mesaId._id ? body.mesaId._id.toString() : null
+    }
+    if (body.clienteId && typeof body.clienteId === 'object') {
+        body.clienteId = body.clienteId._id ? body.clienteId._id.toString() : null
+    }
+
+    const estadoAnterior = turno.estado;
+    const estadoNuevo = body.estado;
+
+    // Snapshot de pagos anteriores
+    const prevE = parseFloat(turno.efectivo) || 0
+    const prevT = parseFloat(turno.transferencia) || 0
 
     const becameCobrado =
         estadoNuevo?.toLowerCase() === 'cobrado' &&
         estadoAnterior?.toLowerCase() !== 'cobrado'
 
-    // Si cambió a "Cobrado"
-    if (becameCobrado) {
-        // Fijar cobradoAt una sola vez (si no existe), para poder auditar/filtrar por momento de cobro
-        if (!turno.cobradoAt) {
-            req.body.cobradoAt = new Date()
-        }
+    if (becameCobrado && !turno.cobradoAt) {
+        body.cobradoAt = new Date()
+    }
 
+    // Guardar turno primero (valida datos antes de tocar caja)
+    Object.assign(turno, body);
+    await turno.save();
+
+    // Turno guardado OK: actualizar caja con delta de pagos
+    const nextE = parseFloat(turno.efectivo) || 0
+    const nextT = parseFloat(turno.transferencia) || 0
+    const deltaE = nextE - prevE
+    const deltaT = nextT - prevT
+
+    if (deltaE !== 0 || deltaT !== 0) {
         const fechaTurnoYMD = formatDateYMD(turno.createdAt)
         const caja = fechaTurnoYMD
             ? await Caja.findOne({ fecha: fechaTurnoYMD, cerrada: false }).sort({ createdAt: -1 })
             : null
 
         if (caja) {
-            const bodyHas = (k) => Object.prototype.hasOwnProperty.call(req.body || {}, k)
-            const efectivo = bodyHas('efectivo') ? (parseFloat(req.body.efectivo) || 0) : (parseFloat(turno.efectivo) || 0)
-            const transferencia = bodyHas('transferencia') ? (parseFloat(req.body.transferencia) || 0) : (parseFloat(turno.transferencia) || 0)
-            const total = bodyHas('total') ? (parseFloat(req.body.total) || 0) : (parseFloat(turno.total) || 0)
+            caja.totalEfectivo = (caja.totalEfectivo || 0) + deltaE
+            caja.totalTransferencia = (caja.totalTransferencia || 0) + deltaT
+            if (caja.totalEfectivo < 0) caja.totalEfectivo = 0
+            if (caja.totalTransferencia < 0) caja.totalTransferencia = 0
 
-            if (!caja.ventas) caja.ventas = [];
+            if (!caja.ventas) caja.ventas = []
             caja.ventas.push({
                 turnoId: turno._id.toString(),
                 tipo: 'turno',
-                total: total,
-                efectivo: efectivo,
-                transferencia: transferencia,
+                total: (deltaE + deltaT),
+                efectivo: deltaE,
+                transferencia: deltaT,
                 fecha: new Date()
-            });
+            })
 
-            await caja.save();
+            await caja.save()
         }
     }
-
-    // Actualizar turno
-    Object.assign(turno, req.body);
-    await turno.save();
 
     res.json(turno);
 });

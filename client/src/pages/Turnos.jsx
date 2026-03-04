@@ -256,8 +256,7 @@ const Turnos = () => {
             ? 'Cobrado'
             : (turnoACobrar.estado || 'Pendiente')
 
-        const turnoActualizado = {
-            ...turnoACobrar,
+        const updatePayload = {
             estado: estadoFinal,
             efectivo: efectivoExistente + nuevoEfectivo,
             transferencia: transferenciaExistente + nuevaTransferencia,
@@ -266,7 +265,7 @@ const Turnos = () => {
         }
 
         try {
-            await api.put(`/turnos/${turnoACobrar._id}`, turnoActualizado)
+            await api.put(`/turnos/${turnoACobrar._id}`, updatePayload)
             setShowCobroModal(false)
             setTurnoACobrar(null)
             setCobroData({ efectivo: 0, transferencia: 0, observaciones: '' })

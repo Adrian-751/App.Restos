@@ -122,32 +122,93 @@ export const updatePedido = asyncHandler(async (req, res) => {
         return res.status(404).json({ error: 'Pedido no encontrado' });
     }
 
+    // Sanitizar body: descartar campos internos y normalizar objetos poblados
+    const body = { ...req.body }
+    delete body._id
+    delete body.__v
+    delete body.createdAt
+    delete body.updatedAt
+    delete body.id
+    if (body.mesaId === '') body.mesaId = null
+    if (body.clienteId === '') body.clienteId = null
+    if (body.mesaId && typeof body.mesaId === 'object') {
+        body.mesaId = body.mesaId._id ? body.mesaId._id.toString() : null
+    }
+    if (body.clienteId && typeof body.clienteId === 'object') {
+        body.clienteId = body.clienteId._id ? body.clienteId._id.toString() : null
+    }
+
     const estadoAnterior = pedido.estado;
-    const estadoNuevo = req.body.estado;
+    const estadoNuevo = body.estado;
 
-    // Sanitizar IDs (evita CastError cuando viene "" desde selects)
-    if (req.body.mesaId === '') req.body.mesaId = null
-    if (req.body.clienteId === '') req.body.clienteId = null
+    // Snapshot de valores anteriores (antes de cualquier cambio)
+    const prevE = parseFloat(pedido.efectivo) || 0
+    const prevT = parseFloat(pedido.transferencia) || 0
+    const prevTotal = parseFloat(pedido.total) || 0
+    const prevClienteId = pedido.clienteId ? pedido.clienteId.toString() : null
 
-    // 1) Caja: sumar pagos parciales (delta efectivo/transferencia) aunque NO esté Cobrado
-    // Esto permite que Caja/Gestión/Métricas reflejen ingresos en tiempo real.
-    {
-        const prevE = parseFloat(pedido.efectivo) || 0
-        const prevT = parseFloat(pedido.transferencia) || 0
-        const nextE = req.body.efectivo != null ? (parseFloat(req.body.efectivo) || 0) : prevE
-        const nextT = req.body.transferencia != null ? (parseFloat(req.body.transferencia) || 0) : prevT
-        const deltaE = nextE - prevE
-        const deltaT = nextT - prevT
+    // Cuenta corriente: sincronizar saldo (antes de guardar para poder ajustar estado)
+    if (estadoAnterior?.toLowerCase() !== 'cobrado') {
+        const oldPaid = prevE + prevT
+        const oldOutstanding = prevTotal - oldPaid
 
-        if (deltaE !== 0 || deltaT !== 0) {
-            // Buscar la caja correcta según la fecha del pedido
-            const fechaPedido = formatDateYMD(pedido.createdAt)
-            let caja = null
-            if (fechaPedido) {
-                // Buscar SOLO caja abierta de esa fecha específica (no hacer fallback a otras fechas)
-                caja = await Caja.findOne({ fecha: fechaPedido, cerrada: false }).sort({ createdAt: -1 })
-            }
-            // Solo registrar si encontramos la caja de esa fecha específica
+        const newTotal = body.total != null ? (parseFloat(body.total) || 0) : prevTotal
+        const newE = body.efectivo != null ? (parseFloat(body.efectivo) || 0) : prevE
+        const newT = body.transferencia != null ? (parseFloat(body.transferencia) || 0) : prevT
+        const newPaid = newE + newT
+        const newOutstanding = newTotal - newPaid
+
+        const newClienteId = body.clienteId !== undefined
+            ? (body.clienteId ? body.clienteId.toString() : null)
+            : prevClienteId
+
+        const adjustCliente = async (clienteId, delta) => {
+            if (!clienteId || !delta) return
+            const cliente = await Cliente.findById(clienteId)
+            if (!cliente) return
+            cliente.cuentaCorriente = (cliente.cuentaCorriente || 0) + delta
+            await cliente.save()
+        }
+
+        if (!prevClienteId && newClienteId) {
+            await adjustCliente(newClienteId, newOutstanding)
+            if (!body.estado) body.estado = 'Cuenta Corriente'
+        } else if (prevClienteId && !newClienteId) {
+            await adjustCliente(prevClienteId, -oldOutstanding)
+        } else if (prevClienteId && newClienteId && prevClienteId !== newClienteId) {
+            await adjustCliente(prevClienteId, -oldOutstanding)
+            await adjustCliente(newClienteId, newOutstanding)
+            if (!body.estado) body.estado = 'Cuenta Corriente'
+        } else if (prevClienteId && newClienteId && prevClienteId === newClienteId) {
+            const deltaTotal = newTotal - prevTotal
+            const deltaPaid = newPaid - oldPaid
+            await adjustCliente(prevClienteId, deltaTotal - deltaPaid)
+        }
+    }
+
+    // Si cambió a "Cobrado", fijar cobradoAt
+    const becameCobrado =
+        body.estado?.toLowerCase() === 'cobrado' &&
+        estadoAnterior?.toLowerCase() !== 'cobrado'
+
+    if (becameCobrado && !pedido.cobradoAt) {
+        body.cobradoAt = new Date()
+    }
+
+    // Guardar pedido
+    Object.assign(pedido, body);
+    await pedido.save();
+
+    // Pedido guardado OK: actualizar caja con delta de pagos
+    const nextE = parseFloat(pedido.efectivo) || 0
+    const nextT = parseFloat(pedido.transferencia) || 0
+    const deltaE = nextE - prevE
+    const deltaT = nextT - prevT
+
+    if (deltaE !== 0 || deltaT !== 0) {
+        const fechaPedido = formatDateYMD(pedido.createdAt)
+        if (fechaPedido) {
+            const caja = await Caja.findOne({ fecha: fechaPedido, cerrada: false }).sort({ createdAt: -1 })
             if (caja) {
                 caja.totalEfectivo = (caja.totalEfectivo || 0) + deltaE
                 caja.totalTransferencia = (caja.totalTransferencia || 0) + deltaT
@@ -168,96 +229,6 @@ export const updatePedido = asyncHandler(async (req, res) => {
             }
         }
     }
-
-    // Si es cuenta corriente (o se asigna/quita cliente), mantener la cuenta corriente sincronizada
-    // con el saldo pendiente (total - pagos). Solo aplica mientras NO esté cobrado.
-    if (estadoAnterior?.toLowerCase() !== 'cobrado') {
-        const oldTotal = parseFloat(pedido.total) || 0
-        const oldE = parseFloat(pedido.efectivo) || 0
-        const oldT = parseFloat(pedido.transferencia) || 0
-        const oldPaid = oldE + oldT
-        const oldOutstanding = oldTotal - oldPaid
-
-        const newTotal = req.body.total != null ? (parseFloat(req.body.total) || 0) : oldTotal
-        const newE = req.body.efectivo != null ? (parseFloat(req.body.efectivo) || 0) : oldE
-        const newT = req.body.transferencia != null ? (parseFloat(req.body.transferencia) || 0) : oldT
-        const newPaid = newE + newT
-        const newOutstanding = newTotal - newPaid
-
-        const oldClienteId = pedido.clienteId ? pedido.clienteId.toString() : null
-        const newClienteId = req.body.clienteId != null
-            ? (req.body.clienteId ? req.body.clienteId.toString() : null)
-            : oldClienteId
-
-        const adjustCliente = async (clienteId, delta) => {
-            if (!clienteId || !delta) return
-            const cliente = await Cliente.findById(clienteId)
-            if (!cliente) return
-            cliente.cuentaCorriente = (cliente.cuentaCorriente || 0) + delta
-            await cliente.save()
-        }
-
-        if (!oldClienteId && newClienteId) {
-            // Se asignó un cliente: sumar el saldo pendiente actual
-            await adjustCliente(newClienteId, newOutstanding)
-            // Forzar estado cuenta corriente si corresponde
-            if (!req.body.estado) req.body.estado = 'Cuenta Corriente'
-        } else if (oldClienteId && !newClienteId) {
-            // Se quitó el cliente: restar el saldo pendiente anterior
-            await adjustCliente(oldClienteId, -oldOutstanding)
-        } else if (oldClienteId && newClienteId && oldClienteId !== newClienteId) {
-            // Se cambió de cliente: mover el saldo
-            await adjustCliente(oldClienteId, -oldOutstanding)
-            await adjustCliente(newClienteId, newOutstanding)
-            if (!req.body.estado) req.body.estado = 'Cuenta Corriente'
-        } else if (oldClienteId && newClienteId && oldClienteId === newClienteId) {
-            // Mismo cliente: ajustar por cambios de total y/o pagos
-            const deltaTotal = newTotal - oldTotal
-            const deltaPaid = newPaid - oldPaid
-            // Cuenta corriente aumenta con deltaTotal, y disminuye con lo pagado
-            await adjustCliente(oldClienteId, deltaTotal - deltaPaid)
-        }
-    }
-
-    // Si cambió a "Cobrado"
-    const becameCobrado =
-        estadoNuevo?.toLowerCase() === 'cobrado' &&
-        estadoAnterior?.toLowerCase() !== 'cobrado'
-
-    if (becameCobrado) {
-        // Fijar cobradoAt una sola vez (si no existe), para poder auditar/filtrar por momento de cobro
-        if (!pedido.cobradoAt) {
-            req.body.cobradoAt = new Date()
-        }
-
-        // Buscar la caja correcta según la fecha del pedido
-        const fechaPedido = formatDateYMD(pedido.createdAt)
-        let caja = null
-        if (fechaPedido) {
-            // Buscar SOLO caja abierta de esa fecha específica (no hacer fallback a otras fechas)
-            caja = await Caja.findOne({ fecha: fechaPedido, cerrada: false }).sort({ createdAt: -1 })
-        }
-        // Solo registrar si encontramos la caja de esa fecha específica
-        if (caja) {
-            const efectivo = parseFloat(req.body.efectivo) || 0;
-            const transferencia = parseFloat(req.body.transferencia) || 0;
-
-            if (!caja.ventas) caja.ventas = [];
-            caja.ventas.push({
-                pedidoId: pedido._id.toString(),
-                total: pedido.total,
-                efectivo,
-                transferencia,
-                fecha: new Date()
-            });
-
-            await caja.save();
-        }
-    }
-
-    // Actualizar pedido
-    Object.assign(pedido, req.body);
-    await pedido.save();
 
     res.json(pedido);
 });

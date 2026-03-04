@@ -4,6 +4,7 @@ import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
 import { toastError, toastInfo, toastSuccess } from '../utils/toast'
 import { useModalHotkeys } from '../hooks/useModalHotkeys'
 import ProductCombobox from '../components/ProductCombobox'
+import { moneyToCents } from '../utils/date'
 
 const Clientes = () => {
     const [clientes, setClientes] = useState([])
@@ -172,9 +173,11 @@ const Clientes = () => {
             const diferencia = total - (pedidoEditando.total || 0)
 
             await api.put(`/pedidos/${pedidoEditando._id}`, {
-                ...pedidoEditando,
-                mesaId: pedidoEditando.mesaId ? pedidoEditando.mesaId : null,
-                clienteId: pedidoEditando.clienteId ? pedidoEditando.clienteId : null,
+                nombre: pedidoEditando.nombre || '',
+                mesaId: pedidoEditando.mesaId && typeof pedidoEditando.mesaId === 'object'
+                    ? pedidoEditando.mesaId._id : (pedidoEditando.mesaId || null),
+                clienteId: pedidoEditando.clienteId && typeof pedidoEditando.clienteId === 'object'
+                    ? pedidoEditando.clienteId._id : (pedidoEditando.clienteId || null),
                 items: pedidoFormData.items,
                 total: total,
             })
@@ -227,12 +230,11 @@ const Clientes = () => {
         const totalPagado = efectivoExistente + transferenciaExistente + nuevoEfectivo + nuevaTransferencia
         const totalPedido = parseFloat(pedidoACobrar.total) || 0
 
-        // Solo se marca como "Cobrado" si el pago es completo
-        const estadoFinal = totalPagado === totalPedido ? 'Cobrado' : (pedidoACobrar.estado || 'Pendiente')
+        const estadoFinal = moneyToCents(totalPagado) >= moneyToCents(totalPedido)
+            ? 'Cobrado' : (pedidoACobrar.estado || 'Pendiente')
 
         try {
             await api.put(`/pedidos/${pedidoACobrar._id}`, {
-                ...pedidoACobrar,
                 estado: estadoFinal,
                 efectivo: efectivoExistente + nuevoEfectivo,
                 transferencia: transferenciaExistente + nuevaTransferencia,

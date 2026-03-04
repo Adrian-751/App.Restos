@@ -80,7 +80,6 @@ const Pedidos = () => {
             setPedidos(Array.isArray(res.data) ? res.data : [])
         } catch (error) {
             console.error('Error fetching pedidos:', error)
-            setPedidos([])
         }
     }
 
@@ -378,7 +377,6 @@ const Pedidos = () => {
     const confirmarCobro = async () => {
         if (!pedidoACobrar) return
 
-        // Sumar los nuevos pagos a los existentes
         const efectivoExistente = parseFloat(pedidoACobrar.efectivo) || 0
         const transferenciaExistente = parseFloat(pedidoACobrar.transferencia) || 0
         const nuevoEfectivo = parseFloat(cobroData.efectivo) || 0
@@ -387,41 +385,33 @@ const Pedidos = () => {
         const totalPagado = efectivoExistente + transferenciaExistente + nuevoEfectivo + nuevaTransferencia
         const totalPedido = parseFloat(pedidoACobrar.total) || 0
 
-        // Solo se marca como "Cobrado" si el pago es completo
         const estadoFinal = moneyToCents(totalPagado) >= moneyToCents(totalPedido)
             ? 'Cobrado'
             : (pedidoACobrar.estado || 'Pendiente')
 
-        // Manejar observaciones
         const obsOriginales = observacionesOriginales || ''
         const obsEnInput = cobroData.observaciones || ''
 
         let observacionesFinales = obsOriginales
 
-        // Si el usuario borró todo, eliminar las observaciones
         if (!obsEnInput.trim()) {
             observacionesFinales = ''
         } else if (obsEnInput.trim() !== obsOriginales.trim()) {
-            // Si las observaciones en el input son más largas que las originales, significa que agregó algo
             if (obsEnInput.trim().length > obsOriginales.trim().length) {
-                // Si las originales están al inicio del input, solo agregar la parte nueva
                 if (obsOriginales.trim() && obsEnInput.trim().startsWith(obsOriginales.trim())) {
                     const parteNueva = obsEnInput.trim().substring(obsOriginales.trim().length).trim()
                     if (parteNueva) {
                         observacionesFinales = obsOriginales + '\n' + parteNueva
                     }
                 } else {
-                    // Si son completamente diferentes, usar las del input
                     observacionesFinales = obsEnInput.trim()
                 }
             } else {
-                // Si son diferentes pero no más largas, usar las del input (el usuario las editó)
                 observacionesFinales = obsEnInput.trim()
             }
         }
 
-        const pedidoActualizado = {
-            ...pedidoACobrar,
+        const updatePayload = {
             estado: estadoFinal,
             efectivo: efectivoExistente + nuevoEfectivo,
             transferencia: transferenciaExistente + nuevaTransferencia,
@@ -430,7 +420,7 @@ const Pedidos = () => {
         }
 
         try {
-            await api.put(`/pedidos/${pedidoACobrar._id}`, pedidoActualizado)
+            await api.put(`/pedidos/${pedidoACobrar._id}`, updatePayload)
             setShowCobroModal(false)
             setPedidoACobrar(null)
             setCobroData({ efectivo: 0, transferencia: 0, observaciones: '' })
