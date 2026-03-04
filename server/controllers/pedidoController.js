@@ -18,18 +18,12 @@ export const getPedidos = asyncHandler(async (req, res) => {
     }
 
     // Filtro opcional por fecha (YYYY-MM-DD) en timezone Argentina.
-    // Esto evita bajar miles de pedidos y filtrar en el frontend.
+    // Usamos $dateToString en aggregation para que coincida con la fecha local de Argentina,
+    // evitando problemas cuando el servidor corre en UTC y los pedidos tienen createdAt en UTC.
     const fechaRaw = req.query?.fecha
     const fecha = typeof fechaRaw === 'string' ? fechaRaw.trim() : ''
-    if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
-        const start = new Date(`${fecha}T00:00:00.000${getArgentinaOffset()}`)
-        const end = new Date(`${fecha}T23:59:59.999${getArgentinaOffset()}`)
-        if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
-            query.createdAt = { $gte: start, $lte: end }
-        }
-    }
+    const useFechaFilter = /^\d{4}-\d{2}-\d{2}$/.test(fecha)
 
-    // Solo aplicamos límite cuando se pide "pendientes", para no romper usos existentes.
     let limit = null
     if (pendientes) {
         const raw = Number(req.query?.limit)
@@ -40,14 +34,47 @@ export const getPedidos = asyncHandler(async (req, res) => {
         }
     }
 
-    let q = Pedido.find(query)
-        .populate('mesaId', 'numero nombre')
-        .populate('clienteId', 'nombre')
-        .sort({ createdAt: -1 });
+    let pedidos
+    if (useFechaFilter) {
+        // Incluir también pedidos de 00:00 a 05:59 del día siguiente (turno nocturno: caja abierta hasta 1-2am)
+        const [y, m, d] = fecha.split('-').map(Number)
+        const nextDay = new Date(y, m - 1, d + 1)
+        const nextDayFecha = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`
 
-    if (limit) q = q.limit(limit)
-
-    const pedidos = await q
+        const pipeline = [
+            { $match: query },
+            { $match: { $expr: { $or: [
+                { $eq: [
+                    { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'America/Argentina/Buenos_Aires' } },
+                    fecha
+                ]},
+                { $and: [
+                    { $eq: [
+                        { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'America/Argentina/Buenos_Aires' } },
+                        nextDayFecha
+                    ]},
+                    { $lt: [
+                        { $toInt: { $dateToString: { format: '%H', date: '$createdAt', timezone: 'America/Argentina/Buenos_Aires' } } },
+                        6
+                    ]}
+                ]}
+            ]}}},
+            { $sort: { createdAt: -1 } },
+            ...(limit ? [{ $limit: limit }] : []),
+            { $lookup: { from: 'mesas', localField: 'mesaId', foreignField: '_id', as: 'mesaId' } },
+            { $unwind: { path: '$mesaId', preserveNullAndEmptyArrays: true } },
+            { $lookup: { from: 'clientes', localField: 'clienteId', foreignField: '_id', as: 'clienteId' } },
+            { $unwind: { path: '$clienteId', preserveNullAndEmptyArrays: true } }
+        ]
+        pedidos = await Pedido.aggregate(pipeline)
+    } else {
+        let q = Pedido.find(query)
+            .populate('mesaId', 'numero nombre')
+            .populate('clienteId', 'nombre')
+            .sort({ createdAt: -1 })
+        if (limit) q = q.limit(limit)
+        pedidos = await q
+    }
     res.json(pedidos);
 });
 
