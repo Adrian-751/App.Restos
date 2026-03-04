@@ -1,9 +1,11 @@
 
+import { logger } from '../utils/logger.js';
+
 /* Middleware centralizado para manejar errores
  * Captura todos los errores y los formatea de manera consistente
  */
 export const errorHandler = (err, req, res, next) => {
-    console.error('Error:', err);
+    logger.error({ err, method: req.method, url: req.url }, 'Request error');
 
     // Error de validación (de express-validator)
     if (err.name === 'ValidationError' || err.name === 'CastError') {
