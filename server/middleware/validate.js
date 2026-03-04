@@ -85,6 +85,26 @@ export const validateCliente = [
     validate
 ];
 
+// Validaciones para actualizar productos (campos opcionales pero validados si presentes)
+export const validateProductoUpdate = [
+    body('nombre')
+        .optional()
+        .trim()
+        .notEmpty()
+        .withMessage('El nombre no puede estar vacío')
+        .isLength({ min: 2, max: 100 })
+        .withMessage('El nombre debe tener entre 2 y 100 caracteres'),
+    body('precio')
+        .optional()
+        .isFloat({ min: 0 })
+        .withMessage('El precio debe ser un número positivo'),
+    body('stock')
+        .optional()
+        .isInt({ min: 0 })
+        .withMessage('El stock debe ser un número entero positivo'),
+    validate
+];
+
 // Validaciones para pedidos
 export const validatePedido = [
     body('items')
