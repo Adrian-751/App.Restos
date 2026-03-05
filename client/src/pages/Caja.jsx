@@ -97,16 +97,14 @@ const Caja = () => {
         const montoInicial = cajaData.montoInicial || 0
         // Efectivo = monto inicial + ventas en efectivo - egresos en efectivo
         const efectivoNeto = montoInicial + totalEfectivo - egresosTotal.efectivo
-        // Transferencia = ventas en transferencia - egresos en transferencia
-        const transferenciaNeta = totalTransferencia - egresosTotal.transferencia
 
         return {
             totalEfectivo: efectivoNeto,
-            totalTransferencia: transferenciaNeta,
+            totalTransferencia: totalTransferencia,
             totalMontoInicial: montoInicial,
             egresos: egresosTotal,
             turnos: { cantidad: cantidadTurnosFinal, total: 0 }, // No mostrar monto en tarjeta Turnos
-            total: efectivoNeto + transferenciaNeta,
+            total: montoInicial + totalEfectivo + totalTransferencia,
         }
     }
 
