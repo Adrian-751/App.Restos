@@ -64,12 +64,8 @@ const pedidoSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Índice compuesto para ?pendientes=true (filtra por estado, ordena por fecha)
+// Índice para búsquedas por estado
 pedidoSchema.index({ estado: 1, createdAt: -1 });
-// Índice para filtro puro por fecha (GET /api/pedidos?fecha=YYYY-MM-DD)
-pedidoSchema.index({ createdAt: -1 });
-// Índice para consultas de cuenta corriente por cliente
-pedidoSchema.index({ clienteId: 1, estado: 1 });
 
 export const getPedidoModel = (conn) => conn.models.Pedido || conn.model('Pedido', pedidoSchema)
 

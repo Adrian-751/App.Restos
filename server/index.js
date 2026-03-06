@@ -1,13 +1,10 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { logger } from './utils/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { tenantMiddleware } from './tenancy/tenant.js';
 import { attachTenantDb } from './tenancy/attachTenantDb.js';
 import { resolveTenant } from './tenancy/tenant.js';
-
 
 // Importar rutas
 import authRoutes from './routes/auth.js';
@@ -24,13 +21,6 @@ import historicoRoutes from './routes/historico.js';
 dotenv.config();
 
 const app = express();
-
-// Helmet: headers de seguridad HTTP
-// Se configura antes que cualquier otra cosa para que aplique a todas las rutas.
-// En producción agrega: X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security, etc.
-// contentSecurityPolicy se desactiva aquí porque la API solo sirve JSON, no HTML —
-// el frontend (Vite/Vercel) maneja su propio CSP.
-app.use(helmet({ contentSecurityPolicy: false }));
 
 // Importante en producción detrás de proxies (Render/Vercel):
 // - Permite que req.ip refleje el IP real (X-Forwarded-For)
@@ -93,7 +83,7 @@ app.use('/api', (req, res, next) => {
     next()
 })
 
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 
 // Rate limiting general para toda la API
 const limiter = rateLimit({
@@ -110,8 +100,7 @@ const limiter = rateLimit({
     // Para escrituras preferimos que siempre pasen (y si hay abuso se controla a otro nivel).
     skip: (req) => req.method !== 'GET',
     // Incluir tenant en la key para evitar colisiones entre clientes (multi-tenant).
-    // ipKeyGenerator normaliza IPv4-mapped IPv6 (::ffff:x.x.x.x) a IPv4 puro.
-    keyGenerator: (req) => `${resolveTenant(req)}|${ipKeyGenerator(req)}`,
+    keyGenerator: (req) => `${resolveTenant(req)}|${req.ip}`,
 });
 
 // Rate limiting más estricto para autenticación
@@ -165,11 +154,11 @@ const PORT = process.env.PORT || 3000;
 const startServer = async () => {
     try {
         app.listen(PORT, () => {
-            logger.info(`Servidor corriendo en http://localhost:${PORT}`);
-            logger.info(`Modo: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+            console.log(`📊 Modo: ${process.env.NODE_ENV || 'development'}`);
         });
     } catch (error) {
-        logger.error({ err: error }, 'Error al iniciar servidor');
+        console.error('❌ Error al iniciar servidor:', error);
         process.exit(1);
     }
 };

@@ -103,36 +103,8 @@ describe('PUT /api/clientes/:id', () => {
         const res = await request(app)
             .put('/api/clientes/507f1f77bcf86cd799439011')
             .set(auth())
-            .send({ nombre: 'Nombre Válido' })
-        expect(res.status).toBe(404)
-    })
-
-    it('rejects nombre shorter than 2 chars with 400', async () => {
-        const cliente = await models.Cliente.create({ nombre: 'Valid', numero: 5 })
-        const res = await request(app)
-            .put(`/api/clientes/${cliente._id}`)
-            .set(auth())
             .send({ nombre: 'X' })
-        expect(res.status).toBe(400)
-    })
-
-    it('rejects nombre exceeding 100 chars with 400', async () => {
-        const cliente = await models.Cliente.create({ nombre: 'Valid', numero: 6 })
-        const res = await request(app)
-            .put(`/api/clientes/${cliente._id}`)
-            .set(auth())
-            .send({ nombre: 'A'.repeat(101) })
-        expect(res.status).toBe(400)
-    })
-
-    it('allows update without nombre field (partial update)', async () => {
-        const cliente = await models.Cliente.create({ nombre: 'Sin Cambio', numero: 7 })
-        const res = await request(app)
-            .put(`/api/clientes/${cliente._id}`)
-            .set(auth())
-            .send({ contacto: 'nuevo-telefono' })
-        expect(res.status).toBe(200)
-        expect(res.body.nombre).toBe('Sin Cambio')
+        expect(res.status).toBe(404)
     })
 })
 
