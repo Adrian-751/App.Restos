@@ -4,6 +4,87 @@ import { toastError, toastInfo, toastSuccess } from '../utils/toast'
 import Modal from '../components/Modal'
 import { useModalHotkeys } from '../hooks/useModalHotkeys'
 
+/**
+ * Calcula el resumen financiero de una caja a partir de sus totales y los
+ * turnos/pedidos cargados. Función pura exportada para facilitar los tests.
+ *
+ * @param {object|null} cajaData  - Documento de caja del backend
+ * @param {Array}       turnos    - Lista de turnos del estado del componente
+ * @param {Array}       pedidos   - Lista de pedidos del estado del componente
+ */
+export const calcularResumen = (cajaData, turnos = [], pedidos = []) => {
+    if (!cajaData) return null
+
+    const egresosArray = Array.isArray(cajaData.egresos) ? cajaData.egresos : []
+    const egresosTotal = egresosArray.reduce(
+        (acc, e) => {
+            acc.efectivo += Number(e?.efectivo || 0)
+            acc.transferencia += Number(e?.transferencia || 0)
+            return acc
+        },
+        { efectivo: 0, transferencia: 0 }
+    )
+    egresosTotal.total = (egresosTotal.efectivo || 0) + (egresosTotal.transferencia || 0)
+
+    const totalEfectivo = Number(cajaData.totalEfectivo || 0)
+    const totalTransferencia = Number(cajaData.totalTransferencia || 0)
+
+    const fechaCaja = cajaData.fecha
+    const cajaCreatedAt = cajaData.createdAt ? new Date(cajaData.createdAt) : null
+    const cajaCerradaAt = cajaData.cerradaAt ? new Date(cajaData.cerradaAt) : null
+    const ahora = new Date()
+
+    const inicioCaja = cajaCreatedAt || new Date(fechaCaja + 'T00:00:00')
+    const finCaja = cajaCerradaAt || ahora
+
+    const turnosArray = Array.isArray(turnos) ? turnos : []
+    const turnosEnRango = turnosArray.filter((t) => {
+        if (!t) return false
+        const estado = String(t.estado || '').toLowerCase()
+        if (estado !== 'cobrado') return false
+        const fechaCobro = new Date(t.cobradoAt || t.updatedAt || t.createdAt || 0)
+        return fechaCobro >= inicioCaja && fechaCobro <= finCaja
+    })
+    const cantidadTurnosDirectos = turnosEnRango.length
+
+    const TURNO_PRODUCTO_NOMBRE = 'turno futbol'
+    const pedidosArray = Array.isArray(pedidos) ? pedidos : []
+    const pedidosEnRango = pedidosArray.filter((p) => {
+        if (!p) return false
+        const estado = String(p.estado || '').toLowerCase()
+        if (estado !== 'cobrado') return false
+        const fechaCobro = new Date(p.cobradoAt || p.updatedAt || p.createdAt || 0)
+        return fechaCobro >= inicioCaja && fechaCobro <= finCaja
+    })
+
+    const turnosDesdePedidos = pedidosEnRango.reduce(
+        (acc, p) => {
+            const items = Array.isArray(p.items) ? p.items : []
+            for (const it of items) {
+                const nombre = String(it?.nombre || '').trim().toLowerCase()
+                if (nombre !== TURNO_PRODUCTO_NOMBRE) continue
+                acc.cantidad += Number(it?.cantidad || 0)
+            }
+            return acc
+        },
+        { cantidad: 0 }
+    )
+
+    const cantidadTurnosFinal = cantidadTurnosDirectos + turnosDesdePedidos.cantidad
+
+    const montoInicial = cajaData.montoInicial || 0
+    const efectivoNeto = montoInicial + totalEfectivo - egresosTotal.efectivo
+
+    return {
+        totalEfectivo: efectivoNeto,
+        totalTransferencia,
+        totalMontoInicial: montoInicial,
+        egresos: egresosTotal,
+        turnos: { cantidad: cantidadTurnosFinal, total: 0 },
+        total: montoInicial + totalEfectivo + totalTransferencia,
+    }
+}
+
 const Caja = () => {
     const [montoInicial, setMontoInicial] = useState('')
     const [fechaCaja, setFechaCaja] = useState('') // Fecha para abrir caja (opcional)
@@ -15,6 +96,11 @@ const Caja = () => {
     const [turnos, setTurnos] = useState([])
     const [pedidos, setPedidos] = useState([])
     const dateInputRef = useRef(null)
+    // Ref para evitar el problema de stale closure en setInterval y event listeners.
+    // El interval captura fetchCaja del primer render (donde caja=null);
+    // con el ref siempre leemos el valor de caja más reciente.
+    const cajaRef = useRef(null)
+    cajaRef.current = caja
     const [showCerrarConfirm, setShowCerrarConfirm] = useState(false)
     const [showEgresoModal, setShowEgresoModal] = useState(false)
     const [showAbrirCajaAnterior, setShowAbrirCajaAnterior] = useState(false)
@@ -24,113 +110,37 @@ const Caja = () => {
         observaciones: '',
     })
 
-    // Calcular resumen desde caja
-    const calcularResumen = (cajaData) => {
-        if (!cajaData) return null
-
-        // Calcular egresos
-        const egresosArray = Array.isArray(cajaData.egresos) ? cajaData.egresos : []
-        const egresosTotal = egresosArray.reduce(
-            (acc, e) => {
-                acc.efectivo += Number(e?.efectivo || 0)
-                acc.transferencia += Number(e?.transferencia || 0)
-                return acc
-            },
-            { efectivo: 0, transferencia: 0 }
-        )
-        egresosTotal.total = (egresosTotal.efectivo || 0) + (egresosTotal.transferencia || 0)
-
-        // Usar los totales que ya están guardados en la caja (calculados por el backend)
-        // Esto evita problemas cuando la caja cruza medianoche
-        const totalEfectivo = Number(cajaData.totalEfectivo || 0)
-        const totalTransferencia = Number(cajaData.totalTransferencia || 0)
-
-        // Calcular turnos: solo contar cantidad COBRADA, NO sumar montos
-        // Los montos de turnos ya están incluidos en totalEfectivo/totalTransferencia
-        const fechaCaja = cajaData.fecha
-        const cajaCreatedAt = cajaData.createdAt ? new Date(cajaData.createdAt) : null
-        const cajaCerradaAt = cajaData.cerradaAt ? new Date(cajaData.cerradaAt) : null
-        const ahora = new Date()
-
-        // Determinar rango de tiempo de la caja
-        const inicioCaja = cajaCreatedAt || new Date(fechaCaja + 'T00:00:00')
-        const finCaja = cajaCerradaAt || ahora
-
-        // Filtrar turnos directos cobrados dentro del rango de tiempo de la caja
-        const turnosArray = Array.isArray(turnos) ? turnos : []
-        const turnosEnRango = turnosArray.filter((t) => {
-            if (!t) return false
-            const estado = String(t.estado || '').toLowerCase()
-            if (estado !== 'cobrado') return false
-            const fechaCobro = new Date(t.cobradoAt || t.updatedAt || t.createdAt || 0)
-            return fechaCobro >= inicioCaja && fechaCobro <= finCaja
-        })
-        const cantidadTurnosDirectos = turnosEnRango.length
-
-        // Contar turnos desde pedidos cobrados (producto "Turno Futbol")
-        const TURNO_PRODUCTO_NOMBRE = 'turno futbol'
-        const pedidosArray = Array.isArray(pedidos) ? pedidos : []
-        const pedidosEnRango = pedidosArray.filter((p) => {
-            if (!p) return false
-            const estado = String(p.estado || '').toLowerCase()
-            if (estado !== 'cobrado') return false
-            const fechaCobro = new Date(p.cobradoAt || p.updatedAt || p.createdAt || 0)
-            return fechaCobro >= inicioCaja && fechaCobro <= finCaja
-        })
-
-        const turnosDesdePedidos = pedidosEnRango.reduce(
-            (acc, p) => {
-                const items = Array.isArray(p.items) ? p.items : []
-                for (const it of items) {
-                    const nombre = String(it?.nombre || '').trim().toLowerCase()
-                    if (nombre !== TURNO_PRODUCTO_NOMBRE) continue
-                    const cantidad = Number(it?.cantidad || 0)
-                    acc.cantidad += cantidad
-                }
-                return acc
-            },
-            { cantidad: 0 }
-        )
-
-        const cantidadTurnosFinal = cantidadTurnosDirectos + turnosDesdePedidos.cantidad
-
-        const montoInicial = cajaData.montoInicial || 0
-        // Efectivo = monto inicial + ventas en efectivo - egresos en efectivo
-        const efectivoNeto = montoInicial + totalEfectivo - egresosTotal.efectivo
-
-        return {
-            totalEfectivo: efectivoNeto,
-            totalTransferencia: totalTransferencia,
-            totalMontoInicial: montoInicial,
-            egresos: egresosTotal,
-            turnos: { cantidad: cantidadTurnosFinal, total: 0 }, // No mostrar monto en tarjeta Turnos
-            total: montoInicial + totalEfectivo + totalTransferencia,
-        }
-    }
-
-    const resumen = calcularResumen(caja)
+    const resumen = calcularResumen(caja, turnos, pedidos)
 
 
     const fetchCaja = async () => {
         try {
+            // Usamos null como centinela de error de red (distinto de data:[] que significa
+            // "el backend respondió OK pero no hay cajas abiertas").
             const [cajaRes, cajasAbiertasRes, turnosRes, pedidosRes] = await Promise.all([
-                api.get('/caja/estado').catch(() => ({ data: null })),
-                api.get('/caja/todas?cerradas=false').catch(() => ({ data: [] })),
+                api.get('/caja/estado').catch(() => null),
+                api.get('/caja/todas?cerradas=false').catch(() => null),
                 api.get('/turnos').catch(() => ({ data: [] })),
                 api.get('/pedidos').catch(() => ({ data: [] })),
             ])
-            const cajasAbiertasArray = Array.isArray(cajasAbiertasRes.data) ? cajasAbiertasRes.data : []
+
+            // Si ambos endpoints de caja fallaron es un error de red transitorio.
+            // No tocamos estado ni localStorage para evitar mostrar la pantalla de
+            // "Abrir Caja" cuando en realidad la caja sigue abierta en el backend.
+            if (!cajaRes && !cajasAbiertasRes) return
+
+            const cajasAbiertasArray = Array.isArray(cajasAbiertasRes?.data) ? cajasAbiertasRes.data : []
             setCajasAbiertas(cajasAbiertasArray)
 
-            // Intentar restaurar la caja seleccionada desde localStorage
             const cajaSeleccionadaId = localStorage.getItem('cajaSeleccionadaId')
-
-            // Determinar qué caja mostrar
             let cajaAMostrar = null
 
-            // Si hay una caja seleccionada en el estado y sigue abierta, mantenerla
-            if (caja && cajasAbiertasArray.find(c => c._id === caja._id)) {
-                const cajaActualizada = cajasAbiertasArray.find(c => c._id === caja._id)
+            // cajaRef.current contiene el valor actual de `caja` incluso desde closures
+            // estáticas (setInterval, event listeners) gracias al ref que se actualiza
+            // en cada render.
+            const cajaActual = cajaRef.current
+            if (cajaActual && cajasAbiertasArray.find(c => c._id === cajaActual._id)) {
+                const cajaActualizada = cajasAbiertasArray.find(c => c._id === cajaActual._id)
                 if (cajaActualizada) {
                     cajaAMostrar = cajaActualizada
                     localStorage.setItem('cajaSeleccionadaId', String(cajaActualizada._id || '').trim())
@@ -138,27 +148,28 @@ const Caja = () => {
                 }
             }
 
-            // Si no hay caja en el estado, intentar restaurar desde localStorage
             if (!cajaAMostrar && cajaSeleccionadaId) {
                 const cajaGuardada = cajasAbiertasArray.find(c => c._id === cajaSeleccionadaId)
                 if (cajaGuardada) {
                     cajaAMostrar = cajaGuardada
                     localStorage.setItem('cajaSeleccionadaFecha', String(cajaGuardada.fecha || '').trim())
                 } else {
-                    // La caja guardada ya no está abierta, limpiar localStorage
-                    localStorage.removeItem('cajaSeleccionadaId')
-                    localStorage.removeItem('cajaSeleccionadaFecha')
+                    // Solo limpiar localStorage si el backend respondió correctamente
+                    // (lista vacía legítima, no un fallo de red).
+                    if (cajasAbiertasRes) {
+                        localStorage.removeItem('cajaSeleccionadaId')
+                        localStorage.removeItem('cajaSeleccionadaFecha')
+                    }
                 }
             }
 
-            // Si no hay caja seleccionada o guardada, usar la principal (más reciente)
             if (!cajaAMostrar) {
-                cajaAMostrar = cajaRes.data || cajasAbiertasArray[0] || null
+                cajaAMostrar = cajaRes?.data || cajasAbiertasArray[0] || null
                 if (cajaAMostrar) {
                     localStorage.setItem('cajaSeleccionadaId', String(cajaAMostrar._id || '').trim())
                     localStorage.setItem('cajaSeleccionadaFecha', String(cajaAMostrar.fecha || '').trim())
-                } else {
-                    // No hay cajas abiertas, limpiar localStorage
+                } else if (cajasAbiertasRes) {
+                    // Solo limpiar si la respuesta fue real (no un error de red).
                     localStorage.removeItem('cajaSeleccionadaId')
                     localStorage.removeItem('cajaSeleccionadaFecha')
                 }

@@ -250,4 +250,141 @@ describe('GET /api/caja/todas', () => {
         expect(res.status).toBe(200)
         expect(res.body.every(c => c.cerrada === false)).toBe(true)
     })
+
+    it('returns an empty array (never null) when no cajas exist', async () => {
+        const res = await request(app).get('/api/caja/todas').set(auth())
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body)).toBe(true)
+    })
+})
+
+// ─── Regression: cerrar + reabrir conserva todos los montos ───────────────────
+// Reproduce el bug de producción: la caja volvía a 0 cuando el usuario cerraba
+// y reabría. El backend debe preservar totalEfectivo, totalTransferencia y
+// egresos al reabrir una caja cerrada.
+
+describe('Regression: close + reopen preserves totals', () => {
+    it('reopening a closed caja preserves totalEfectivo, totalTransferencia, montoInicial and egresos', async () => {
+        const caja = await models.Caja.create({
+            fecha: today(),
+            cerrada: false,
+            montoInicial: 500,
+            totalEfectivo: 1500,
+            totalTransferencia: 800,
+            egresos: [{ efectivo: 100, transferencia: 0, observaciones: 'Limpieza' }],
+        })
+
+        await request(app).post('/api/caja/cerrar').set(auth()).send({ id: caja._id.toString() })
+
+        const reopenRes = await request(app)
+            .post('/api/caja/abrir')
+            .set(auth())
+            .send({ fecha: today() })
+
+        expect(reopenRes.status).toBe(200)
+        expect(reopenRes.body.cerrada).toBe(false)
+        expect(reopenRes.body.totalEfectivo).toBe(1500)
+        expect(reopenRes.body.totalTransferencia).toBe(800)
+        expect(reopenRes.body.montoInicial).toBe(500)
+        expect(reopenRes.body.egresos).toHaveLength(1)
+        expect(reopenRes.body.egresos[0].efectivo).toBe(100)
+    })
+
+    it('does NOT reset montoInicial when reopening without providing it in body', async () => {
+        await models.Caja.create({
+            fecha: today(),
+            cerrada: true,
+            montoInicial: 1200,
+            totalEfectivo: 400,
+            totalTransferencia: 0,
+        })
+
+        const res = await request(app)
+            .post('/api/caja/abrir')
+            .set(auth())
+            .send({ fecha: today() }) // sin montoInicial
+
+        expect(res.body.montoInicial).toBe(1200)
+    })
+
+    it('updates montoInicial only when explicitly provided on reopen', async () => {
+        await models.Caja.create({
+            fecha: today(),
+            cerrada: true,
+            montoInicial: 1000,
+            totalEfectivo: 0,
+            totalTransferencia: 0,
+        })
+
+        const res = await request(app)
+            .post('/api/caja/abrir')
+            .set(auth())
+            .send({ fecha: today(), montoInicial: 2500 })
+
+        expect(res.body.montoInicial).toBe(2500)
+    })
+})
+
+// ─── GET /api/caja/estado con múltiples cajas abiertas ────────────────────────
+
+describe('GET /api/caja/estado - multiple open cajas', () => {
+    it('returns the most recently created open caja when multiple exist', async () => {
+        await models.Caja.create({ fecha: '2026-03-01', cerrada: false })
+        await new Promise((r) => setTimeout(r, 20))
+        const newer = await models.Caja.create({ fecha: today(), cerrada: false })
+
+        const res = await request(app).get('/api/caja/estado').set(auth())
+        expect(res.status).toBe(200)
+        expect(res.body._id).toBe(newer._id.toString())
+    })
+
+    it('returns null (not 404) when no open cajas exist', async () => {
+        await models.Caja.create({ fecha: today(), cerrada: true })
+        const res = await request(app).get('/api/caja/estado').set(auth())
+        expect(res.status).toBe(200)
+        expect(res.body).toBeNull()
+    })
+})
+
+// ─── POST /api/caja/egreso - apunta a la caja correcta por fecha ──────────────
+
+describe('POST /api/caja/egreso - targets caja by fecha', () => {
+    it('registers egreso in the caja matching the given fecha, not in the newest', async () => {
+        const cajaVieja = await models.Caja.create({
+            fecha: '2026-03-01',
+            cerrada: false,
+            totalEfectivo: 1000,
+        })
+        await models.Caja.create({ fecha: today(), cerrada: false, totalEfectivo: 500 })
+
+        const res = await request(app)
+            .post('/api/caja/egreso')
+            .set(auth())
+            .send({ efectivo: 150, fecha: '2026-03-01' })
+
+        expect(res.status).toBe(201)
+
+        const updated = await models.Caja.findById(cajaVieja._id)
+        expect(updated.egresos).toHaveLength(1)
+        expect(updated.egresos[0].efectivo).toBe(150)
+
+        const hoy = await models.Caja.findOne({ fecha: today() })
+        expect(hoy.egresos).toHaveLength(0)
+    })
+
+    it('falls back to most recent open caja when no fecha is provided', async () => {
+        await models.Caja.create({ fecha: '2026-03-01', cerrada: false, totalEfectivo: 200 })
+        await new Promise((r) => setTimeout(r, 20))
+        const newest = await models.Caja.create({ fecha: today(), cerrada: false, totalEfectivo: 500 })
+
+        const res = await request(app)
+            .post('/api/caja/egreso')
+            .set(auth())
+            .send({ transferencia: 75 })
+
+        expect(res.status).toBe(201)
+        const updated = await models.Caja.findById(newest._id)
+        expect(updated.egresos).toHaveLength(1)
+        expect(updated.egresos[0].transferencia).toBe(75)
+    })
 })
