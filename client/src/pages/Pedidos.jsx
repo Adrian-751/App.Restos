@@ -360,6 +360,14 @@ const Pedidos = () => {
         }
     }
 
+    const handleSavePedido = (abrirCobro) => {
+        if (!formData.items || formData.items.length === 0) {
+            alert('Debés agregar al menos un producto antes de guardar el pedido.')
+            return
+        }
+        savePedido(abrirCobro)
+    }
+
     const cobrarPedido = (pedido) => {
         // Guardar el pedido que vamos a cobrar
         setPedidoACobrar(pedido)
@@ -790,14 +798,14 @@ const Pedidos = () => {
 
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <button
-                                    onClick={() => savePedido(false)}
+                                    onClick={() => handleSavePedido(false)}
                                     className="btn-primary w-full sm:flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
                                     disabled={isSaving}
                                 >
                                     {isSaving && saveMode === 'guardar' ? 'Guardando…' : 'Guardar'}
                                 </button>
                                 <button
-                                    onClick={() => savePedido(true)}
+                                    onClick={() => handleSavePedido(true)}
                                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors w-full sm:flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
                                     disabled={isSaving}
                                 >
