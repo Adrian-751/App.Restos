@@ -20,14 +20,14 @@ const Productos = () => {
     const [loteForm, setLoteForm] = useState({ productoId: '', cantidad: '', observaciones: '' })
     const [showLoteForm, setShowLoteForm] = useState(false)
 
-    useLockBodyScroll(!!showModal)
+    useLockBodyScroll(!!showModal || !!showInventario)
 
     const openEditModal = (producto = null) => {
         if (producto) {
             setFormData({
                 numero: producto.numero,
                 nombre: producto.nombre,
-                costo: producto.costo ?? '',
+                costo: producto.costo || '',
                 precio: producto.precio,
                 categoria: producto.categoria || 'general',
             })
@@ -134,6 +134,20 @@ const Productos = () => {
         }
     }
 
+    const calcLoteActivo = (producto) => {
+        const lotesProducto = lotes
+            .filter(l => l.productoId === producto._id)
+            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+        if (lotesProducto.length === 0) return null
+        const consumed = (producto.stock || 0) - (producto.cantidadDisponible || 0)
+        let accum = 0
+        for (let i = 0; i < lotesProducto.length; i++) {
+            accum += lotesProducto[i].cantidad
+            if (consumed < accum) return i + 1
+        }
+        return lotesProducto.length
+    }
+
     const deleteLote = async (id) => {
         if (!window.confirm('¿Eliminar este lote? El stock del producto se reducirá.')) return
         try {
@@ -164,11 +178,6 @@ const Productos = () => {
                         className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors w-full sm:w-auto"
                     >
                         + Inventario
-                        {lotes.length > 0 && (
-                            <span className="ml-2 bg-emerald-800 text-emerald-200 text-xs px-2 py-0.5 rounded-full">
-                                {lotes.length} {lotes.length === 1 ? 'lote' : 'lotes'}
-                            </span>
-                        )}
                     </button>
                     <button onClick={() => openEditModal()} className="btn-primary w-full sm:w-auto">
                         + Nuevo Producto
@@ -213,6 +222,16 @@ const Productos = () => {
                                     {producto.cantidadDisponible || 0} / {producto.stock || 0}
                                 </span>
                             </div>
+                            {(() => {
+                                const loteNum = calcLoteActivo(producto)
+                                if (!loteNum) return null
+                                return (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-400">Lote abierto:</span>
+                                        <span className="text-emerald-400 font-semibold">#{loteNum}</span>
+                                    </div>
+                                )
+                            })()}
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-2">
@@ -300,17 +319,28 @@ const Productos = () => {
                         {/* Lista de productos con sus lotes */}
                         <div className="space-y-3">
                             {productos.map((producto) => {
-                                const lotesProducto = lotes.filter(l => l.productoId === producto._id)
+                                const lotesProducto = lotes
+                                    .filter(l => l.productoId === producto._id)
+                                    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+                                    .map((lote, idx) => ({ ...lote, numero: idx + 1 }))
+                                const loteActivoNum = calcLoteActivo(producto)
                                 return (
                                     <div key={producto._id} className="bg-slate-700 rounded-lg p-3">
                                         <div className="flex items-center justify-between mb-2">
                                             <div>
                                                 <span className="text-white font-medium">#{producto.numero} {producto.nombre}</span>
-                                                <span className="ml-2 text-xs text-slate-400">
-                                                    Stock: <span className={producto.cantidadDisponible > 0 ? 'text-green-400' : 'text-red-400'}>
-                                                        {producto.cantidadDisponible || 0} / {producto.stock || 0}
+                                                <div className="flex gap-3 mt-0.5">
+                                                    <span className="text-xs text-slate-400">
+                                                        Stock: <span className={producto.cantidadDisponible > 0 ? 'text-green-400' : 'text-red-400'}>
+                                                            {producto.cantidadDisponible || 0} / {producto.stock || 0}
+                                                        </span>
                                                     </span>
-                                                </span>
+                                                    {loteActivoNum && (
+                                                        <span className="text-xs text-slate-400">
+                                                            Lote abierto: <span className="text-emerald-400 font-semibold">#{loteActivoNum}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                             <button
                                                 onClick={() => { setLoteForm({ productoId: producto._id, cantidad: '', observaciones: '' }); setShowLoteForm(true) }}
@@ -322,13 +352,16 @@ const Productos = () => {
                                         {lotesProducto.length > 0 && (
                                             <div className="space-y-1 mt-2 border-t border-slate-600 pt-2">
                                                 {lotesProducto.map((lote) => (
-                                                    <div key={lote._id} className="flex items-center justify-between text-xs">
-                                                        <span className="text-slate-300">
-                                                            <span className="text-emerald-400 font-semibold">+{lote.cantidad}</span>
-                                                            {lote.observaciones && <span className="text-slate-400 ml-1">— {lote.observaciones}</span>}
-                                                            <span className="text-slate-500 ml-1">{new Date(lote.createdAt).toLocaleDateString('es-AR')}</span>
+                                                    <div key={lote._id} className="flex items-center justify-between text-xs py-0.5">
+                                                        <span className="text-slate-300 flex items-center gap-2">
+                                                            <span className={`font-bold ${lote.numero === loteActivoNum ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                                                Lote #{lote.numero}
+                                                            </span>
+                                                            <span className="text-white">Cantidad: {lote.cantidad}</span>
+                                                            {lote.observaciones && <span className="text-slate-400">— {lote.observaciones}</span>}
+                                                            <span className="text-slate-500">{new Date(lote.createdAt).toLocaleDateString('es-AR')}</span>
                                                         </span>
-                                                        <button onClick={() => deleteLote(lote._id)} className="text-red-400 hover:text-red-300 ml-2">🗑️</button>
+                                                        <button onClick={() => deleteLote(lote._id)} className="text-red-400 hover:text-red-300 ml-2 shrink-0">🗑️</button>
                                                     </div>
                                                 ))}
                                             </div>

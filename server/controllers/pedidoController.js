@@ -118,7 +118,7 @@ export const createPedido = asyncHandler(async (req, res) => {
  * PUT /api/pedidos/:id
  */
 export const updatePedido = asyncHandler(async (req, res) => {
-    const { Pedido, Cliente, Caja } = req.models
+    const { Pedido, Cliente, Caja, Producto } = req.models
     const pedido = await Pedido.findById(req.params.id);
 
     if (!pedido) {
@@ -201,6 +201,21 @@ export const updatePedido = asyncHandler(async (req, res) => {
     // Guardar pedido
     Object.assign(pedido, body);
     await pedido.save();
+
+    // Descontar stock al cobrar
+    if (becameCobrado) {
+        const items = Array.isArray(pedido.items) ? pedido.items : []
+        for (const item of items) {
+            if (!item.productoId) continue
+            const cantidad = parseInt(item.cantidad) || 0
+            if (cantidad > 0) {
+                await Producto.findByIdAndUpdate(
+                    item.productoId,
+                    [{ $set: { cantidadDisponible: { $max: [0, { $subtract: ['$cantidadDisponible', cantidad] }] } } }]
+                )
+            }
+        }
+    }
 
     // Pedido guardado OK: actualizar caja con delta de pagos
     const nextE = parseFloat(pedido.efectivo) || 0
