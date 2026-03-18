@@ -11,11 +11,14 @@ const Productos = () => {
     const [formData, setFormData] = useState({
         numero: '',
         nombre: '',
+        costo: '',
         precio: '',
-        stock: '',
-        cantidadDisponible: '',
         categoria: 'general',
     })
+    const [showInventario, setShowInventario] = useState(false)
+    const [lotes, setLotes] = useState([])
+    const [loteForm, setLoteForm] = useState({ productoId: '', cantidad: '', observaciones: '' })
+    const [showLoteForm, setShowLoteForm] = useState(false)
 
     useLockBodyScroll(!!showModal)
 
@@ -24,18 +27,16 @@ const Productos = () => {
             setFormData({
                 numero: producto.numero,
                 nombre: producto.nombre,
+                costo: producto.costo ?? '',
                 precio: producto.precio,
-                stock: producto.stock,
-                cantidadDisponible: producto.cantidadDisponible,
                 categoria: producto.categoria || 'general',
             })
         } else {
             setFormData({
                 numero: '',
                 nombre: '',
+                costo: '',
                 precio: '',
-                stock: '',
-                cantidadDisponible: '',
                 categoria: 'general',
             })
         }
@@ -45,6 +46,7 @@ const Productos = () => {
 
     useEffect(() => {
         fetchProductos()
+        fetchLotes()
     }, [])
 
     const fetchProductos = async () => {
@@ -59,10 +61,11 @@ const Productos = () => {
     const saveProducto = async () => {
         try {
             const data = {
-                ...formData,
+                numero: formData.numero,
+                nombre: formData.nombre,
+                costo: parseFloat(formData.costo) || 0,
                 precio: parseFloat(formData.precio) || 0,
-                stock: parseInt(formData.stock) || 0,
-                cantidadDisponible: parseInt(formData.cantidadDisponible || formData.stock) || 0,
+                categoria: formData.categoria,
             }
 
             if (editingProducto) {
@@ -105,6 +108,44 @@ const Productos = () => {
         }
     }
 
+    const fetchLotes = async () => {
+        try {
+            const res = await api.get('/lotes')
+            setLotes(res.data)
+        } catch (error) {
+            console.error('Error fetching lotes:', error)
+        }
+    }
+
+    const saveLote = async () => {
+        try {
+            await api.post('/lotes', {
+                productoId: loteForm.productoId,
+                cantidad: parseInt(loteForm.cantidad) || 0,
+                observaciones: loteForm.observaciones,
+            })
+            setLoteForm({ productoId: '', cantidad: '', observaciones: '' })
+            setShowLoteForm(false)
+            fetchLotes()
+            fetchProductos()
+        } catch (error) {
+            const errorMsg = error.response?.data?.error || 'Error al agregar el lote'
+            toastError(errorMsg)
+        }
+    }
+
+    const deleteLote = async (id) => {
+        if (!window.confirm('¿Eliminar este lote? El stock del producto se reducirá.')) return
+        try {
+            await api.delete(`/lotes/${id}`)
+            fetchLotes()
+            fetchProductos()
+        } catch (error) {
+            const errorMsg = error.response?.data?.error || 'Error al eliminar el lote'
+            toastError(errorMsg)
+        }
+    }
+
     // Hotkeys modal: ESC = cancelar, ENTER = guardar
     useModalHotkeys({
         isOpen: showModal,
@@ -117,9 +158,22 @@ const Productos = () => {
         <div className="space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-2xl sm:text-3xl font-bold text-white">Productos</h2>
-                <button onClick={() => openEditModal()} className="btn-primary w-full sm:w-auto">
-                    + Nuevo Producto
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <button
+                        onClick={() => { setShowInventario(true) }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors w-full sm:w-auto"
+                    >
+                        + Inventario
+                        {lotes.length > 0 && (
+                            <span className="ml-2 bg-emerald-800 text-emerald-200 text-xs px-2 py-0.5 rounded-full">
+                                {lotes.length} {lotes.length === 1 ? 'lote' : 'lotes'}
+                            </span>
+                        )}
+                    </button>
+                    <button onClick={() => openEditModal()} className="btn-primary w-full sm:w-auto">
+                        + Nuevo Producto
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -136,6 +190,14 @@ const Productos = () => {
                         </div>
 
                         <div className="space-y-2 mb-4">
+                            {producto.costo > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-400">Costo:</span>
+                                    <span className="text-slate-300 font-semibold">
+                                        ${producto.costo?.toLocaleString()}
+                                    </span>
+                                </div>
+                            )}
                             <div className="flex justify-between text-sm">
                                 <span className="text-slate-400">Precio:</span>
                                 <span className="text-white font-semibold">
@@ -185,6 +247,100 @@ const Productos = () => {
                 ))}
             </div>
 
+            {/* Modal de Inventario */}
+            {showInventario && (
+                <div className="fixed inset-0 bg-black/50 z-[60] p-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center">
+                    <div className="card bg-slate-800 max-w-2xl w-full max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-bold text-white">Inventario</h3>
+                            <button
+                                onClick={() => { setShowInventario(false); setShowLoteForm(false); setLoteForm({ productoId: '', cantidad: '', observaciones: '' }) }}
+                                className="text-slate-400 hover:text-white text-2xl leading-none"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        {/* Formulario agregar lote */}
+                        {showLoteForm ? (
+                            <div className="bg-slate-700 rounded-lg p-4 mb-4 space-y-3">
+                                <h4 className="text-sm font-semibold text-slate-200">Agregar lote a: <span className="text-emerald-400">{productos.find(p => p._id === loteForm.productoId)?.nombre}</span></h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-300 mb-1">Cantidad</label>
+                                        <input
+                                            type="number"
+                                            value={loteForm.cantidad}
+                                            onChange={(e) => setLoteForm({ ...loteForm, cantidad: e.target.value })}
+                                            className="input-field"
+                                            min="1"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-300 mb-1">Observaciones (opcional)</label>
+                                        <input
+                                            type="text"
+                                            value={loteForm.observaciones}
+                                            onChange={(e) => setLoteForm({ ...loteForm, observaciones: e.target.value })}
+                                            className="input-field"
+                                            placeholder="Ej: Compra 15/03"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={saveLote} className="btn-primary flex-1">Guardar Lote</button>
+                                    <button onClick={() => { setShowLoteForm(false); setLoteForm({ productoId: '', cantidad: '', observaciones: '' }) }} className="btn-secondary flex-1">Cancelar</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-slate-400 text-sm mb-4">Seleccioná un producto para agregar un lote de stock.</p>
+                        )}
+
+                        {/* Lista de productos con sus lotes */}
+                        <div className="space-y-3">
+                            {productos.map((producto) => {
+                                const lotesProducto = lotes.filter(l => l.productoId === producto._id)
+                                return (
+                                    <div key={producto._id} className="bg-slate-700 rounded-lg p-3">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div>
+                                                <span className="text-white font-medium">#{producto.numero} {producto.nombre}</span>
+                                                <span className="ml-2 text-xs text-slate-400">
+                                                    Stock: <span className={producto.cantidadDisponible > 0 ? 'text-green-400' : 'text-red-400'}>
+                                                        {producto.cantidadDisponible || 0} / {producto.stock || 0}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={() => { setLoteForm({ productoId: producto._id, cantidad: '', observaciones: '' }); setShowLoteForm(true) }}
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1 rounded-lg"
+                                            >
+                                                + Lote
+                                            </button>
+                                        </div>
+                                        {lotesProducto.length > 0 && (
+                                            <div className="space-y-1 mt-2 border-t border-slate-600 pt-2">
+                                                {lotesProducto.map((lote) => (
+                                                    <div key={lote._id} className="flex items-center justify-between text-xs">
+                                                        <span className="text-slate-300">
+                                                            <span className="text-emerald-400 font-semibold">+{lote.cantidad}</span>
+                                                            {lote.observaciones && <span className="text-slate-400 ml-1">— {lote.observaciones}</span>}
+                                                            <span className="text-slate-500 ml-1">{new Date(lote.createdAt).toLocaleDateString('es-AR')}</span>
+                                                        </span>
+                                                        <button onClick={() => deleteLote(lote._id)} className="text-red-400 hover:text-red-300 ml-2">🗑️</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal de Producto */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 z-[60] p-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] overflow-y-auto overscroll-contain flex items-start sm:items-center justify-center">
@@ -217,6 +373,19 @@ const Productos = () => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-2">
+                                    Costo
+                                </label>
+                                <input
+                                    type="number"
+                                    value={formData.costo}
+                                    onChange={(e) => setFormData({ ...formData, costo: e.target.value })}
+                                    className="input-field"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">
                                     Precio de Venta
                                 </label>
                                 <input
@@ -225,30 +394,6 @@ const Productos = () => {
                                     onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
                                     className="input-field"
                                     step="0.01"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">
-                                    Stock
-                                </label>
-                                <input
-                                    type="number"
-                                    value={formData.stock}
-                                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                                    className="input-field"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">
-                                    Cantidad Disponible
-                                </label>
-                                <input
-                                    type="number"
-                                    value={formData.cantidadDisponible}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, cantidadDisponible: e.target.value })
-                                    }
-                                    className="input-field"
                                 />
                             </div>
                             <div>

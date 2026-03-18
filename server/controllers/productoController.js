@@ -16,7 +16,7 @@ export const getProductos = asyncHandler(async (req, res) => {
  */
 export const createProducto = asyncHandler(async (req, res) => {
     const { Producto } = req.models
-    const { nombre, precio, stock, categoria, descripcion } = req.body;
+    const { nombre, precio, costo, stock, categoria, descripcion } = req.body;
 
     // Calcular número automático si no se proporciona
     let numero = req.body.numero;
@@ -29,6 +29,7 @@ export const createProducto = asyncHandler(async (req, res) => {
         numero,
         nombre,
         precio: parseFloat(precio) || 0,
+        costo: parseFloat(costo) || 0,
         stock: parseInt(stock) || 0,
         cantidadDisponible: parseInt(stock) || 0,
         categoria: categoria || 'general',

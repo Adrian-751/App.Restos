@@ -16,6 +16,7 @@ import productosRoutes from './routes/productos.js';
 import turnosRoutes from './routes/turnos.js';
 import metricasRoutes from './routes/metricas.js';
 import historicoRoutes from './routes/historico.js';
+import lotesRoutes from './routes/lotes.js';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -145,6 +146,7 @@ app.use('/api/productos', productosRoutes);
 app.use('/api/turnos', turnosRoutes);
 app.use('/api/metricas', metricasRoutes);
 app.use('/api/historico', historicoRoutes);
+app.use('/api/lotes', lotesRoutes);
 
 // Middleware de manejo de errores (debe ir al final, después de todas las rutas)
 app.use(errorHandler);

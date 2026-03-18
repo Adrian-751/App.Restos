@@ -1,6 +1,7 @@
 import { getCajaModel } from '../models/Caja.js'
 import { getClienteModel } from '../models/Cliente.js'
 import { getAppStateModel } from '../models/AppState.js'
+import { getLoteModel } from '../models/Lote.js'
 import { getMesaModel } from '../models/Mesa.js'
 import { getPedidoModel } from '../models/Pedido.js'
 import { getProductoModel } from '../models/Producto.js'
@@ -12,6 +13,7 @@ export const getModels = (conn) => {
         AppState: getAppStateModel(conn),
         Caja: getCajaModel(conn),
         Cliente: getClienteModel(conn),
+        Lote: getLoteModel(conn),
         Mesa: getMesaModel(conn),
         Pedido: getPedidoModel(conn),
         Producto: getProductoModel(conn),
