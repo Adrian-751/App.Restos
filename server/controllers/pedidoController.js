@@ -202,22 +202,7 @@ export const updatePedido = asyncHandler(async (req, res) => {
     Object.assign(pedido, body);
     await pedido.save();
 
-    // Descontar stock al cobrar
-    if (becameCobrado) {
-        const items = Array.isArray(pedido.items) ? pedido.items : []
-        for (const item of items) {
-            if (!item.productoId) continue
-            const cantidad = parseInt(item.cantidad) || 0
-            if (cantidad > 0) {
-                await Producto.findByIdAndUpdate(
-                    item.productoId,
-                    [{ $set: { cantidadDisponible: { $max: [0, { $subtract: ['$cantidadDisponible', cantidad] }] } } }]
-                )
-            }
-        }
-    }
-
-    // Pedido guardado OK: actualizar caja con delta de pagos
+    // Actualizar caja con delta de pagos
     const nextE = parseFloat(pedido.efectivo) || 0
     const nextT = parseFloat(pedido.transferencia) || 0
     const deltaE = nextE - prevE
@@ -244,6 +229,25 @@ export const updatePedido = asyncHandler(async (req, res) => {
                 })
 
                 await caja.save()
+            }
+        }
+    }
+
+    // Descontar cantidadDisponible al cobrar (compatible con todas las versiones de MongoDB)
+    if (becameCobrado) {
+        const items = Array.isArray(pedido.items) ? pedido.items : []
+        for (const item of items) {
+            if (!item.productoId) continue
+            const cantidad = parseInt(item.cantidad) || 0
+            if (cantidad <= 0) continue
+            try {
+                const prod = await Producto.findById(item.productoId)
+                if (prod) {
+                    const nueva = Math.max(0, (prod.cantidadDisponible || 0) - cantidad)
+                    await Producto.updateOne({ _id: prod._id }, { $set: { cantidadDisponible: nueva } })
+                }
+            } catch (stockErr) {
+                console.error(`Error descontando stock producto ${item.productoId}:`, stockErr)
             }
         }
     }

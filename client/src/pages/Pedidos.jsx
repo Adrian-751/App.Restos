@@ -438,6 +438,7 @@ const Pedidos = () => {
             fetchPedidos()
             window.dispatchEvent(new Event('caja-updated'))
             if (estadoFinal === 'Cobrado') {
+                window.dispatchEvent(new Event('stock-actualizado'))
                 toastSuccess('Pedido cobrado. Caja actualizada.')
             } else {
                 const restante = (moneyToCents(totalPedido) - moneyToCents(totalPagado)) / 100

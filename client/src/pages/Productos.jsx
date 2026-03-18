@@ -47,6 +47,25 @@ const Productos = () => {
     useEffect(() => {
         fetchProductos()
         fetchLotes()
+
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                fetchProductos()
+                fetchLotes()
+            }
+        }
+        document.addEventListener('visibilitychange', onVisibility)
+
+        const onStockUpdate = () => {
+            fetchProductos()
+            fetchLotes()
+        }
+        window.addEventListener('stock-actualizado', onStockUpdate)
+
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibility)
+            window.removeEventListener('stock-actualizado', onStockUpdate)
+        }
     }, [])
 
     const fetchProductos = async () => {
@@ -329,17 +348,12 @@ const Productos = () => {
                                         <div className="flex items-center justify-between mb-2">
                                             <div>
                                                 <span className="text-white font-medium">#{producto.numero} {producto.nombre}</span>
-                                                <div className="flex gap-3 mt-0.5">
+                                                <div className="mt-0.5">
                                                     <span className="text-xs text-slate-400">
                                                         Stock: <span className={producto.cantidadDisponible > 0 ? 'text-green-400' : 'text-red-400'}>
                                                             {producto.cantidadDisponible || 0} / {producto.stock || 0}
                                                         </span>
                                                     </span>
-                                                    {loteActivoNum && (
-                                                        <span className="text-xs text-slate-400">
-                                                            Lote abierto: <span className="text-emerald-400 font-semibold">#{loteActivoNum}</span>
-                                                        </span>
-                                                    )}
                                                 </div>
                                             </div>
                                             <button
@@ -414,7 +428,6 @@ const Productos = () => {
                                     onChange={(e) => setFormData({ ...formData, costo: e.target.value })}
                                     className="input-field"
                                     step="0.01"
-                                    placeholder="0.00"
                                 />
                             </div>
                             <div>

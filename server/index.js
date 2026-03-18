@@ -84,7 +84,7 @@ app.use('/api', (req, res, next) => {
     next()
 })
 
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 // Rate limiting general para toda la API
 const limiter = rateLimit({
@@ -101,7 +101,7 @@ const limiter = rateLimit({
     // Para escrituras preferimos que siempre pasen (y si hay abuso se controla a otro nivel).
     skip: (req) => req.method !== 'GET',
     // Incluir tenant en la key para evitar colisiones entre clientes (multi-tenant).
-    keyGenerator: (req) => `${resolveTenant(req)}|${req.ip}`,
+    keyGenerator: (req) => `${resolveTenant(req)}|${ipKeyGenerator(req)}`,
 });
 
 // Rate limiting más estricto para autenticación
