@@ -328,7 +328,8 @@ test.describe('Pedidos – protección contra doble guardado', () => {
         const guardarBtn = page.locator('button:has-text("Guardar")')
 
         const [disabledSeen] = await Promise.all([
-            guardarBtn.evaluate((btn) => {
+            guardarBtn.evaluate((el) => {
+                const btn = /** @type {HTMLButtonElement} */ (el)
                 return new Promise((resolve) => {
                     const obs = new MutationObserver(() => {
                         if (btn.disabled) { obs.disconnect(); resolve(true) }
