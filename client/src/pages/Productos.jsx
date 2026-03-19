@@ -15,6 +15,7 @@ const Productos = () => {
         precio: '',
         categoria: 'general',
     })
+    const [busqueda, setBusqueda] = useState('')
     const [showInventario, setShowInventario] = useState(false)
     const [lotes, setLotes] = useState([])
     const [loteForm, setLoteForm] = useState({ productoId: '', cantidad: '', observaciones: '' })
@@ -192,6 +193,13 @@ const Productos = () => {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-2xl sm:text-3xl font-bold text-white">Productos</h2>
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <input
+                        type="text"
+                        value={busqueda}
+                        onChange={(e) => setBusqueda(e.target.value)}
+                        placeholder="Buscar producto..."
+                        className="input-field text-sm py-1.5 w-full sm:w-48"
+                    />
                     <button
                         onClick={() => { setShowInventario(true) }}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors w-full sm:w-auto"
@@ -205,7 +213,7 @@ const Productos = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {productos.map((producto) => (
+                {productos.filter(p => p.nombre?.toLowerCase().includes(busqueda.toLowerCase())).map((producto) => (
                     <div key={producto._id} className="card">
                         <div className="flex justify-between items-start mb-4">
                             <div>

@@ -8,6 +8,7 @@ import { moneyToCents } from '../utils/date'
 
 const Clientes = () => {
     const [clientes, setClientes] = useState([])
+    const [busqueda, setBusqueda] = useState('')
     const [productos, setProductos] = useState([])
     const [showModal, setShowModal] = useState(false)
     const [editingCliente, setEditingCliente] = useState(null)
@@ -612,7 +613,14 @@ const Clientes = () => {
         <div className="space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-2xl sm:text-3xl font-bold text-white">Clientes</h2>
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <input
+                        type="text"
+                        value={busqueda}
+                        onChange={(e) => setBusqueda(e.target.value)}
+                        placeholder="Buscar cliente..."
+                        className="input-field text-sm py-1.5 w-full sm:w-48"
+                    />
                     <button onClick={openNuevoPedidoModal} className="btn-primary w-full sm:w-auto">
                         + Nuevo Pedido
                     </button>
@@ -623,7 +631,7 @@ const Clientes = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {clientes.map((cliente) => (
+                {clientes.filter(c => c.nombre?.toLowerCase().includes(busqueda.toLowerCase())).map((cliente) => (
                     <div key={cliente._id} className="card">
                         <div className="flex justify-between items-start mb-4">
                             <div>
