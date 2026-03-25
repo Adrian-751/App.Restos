@@ -51,6 +51,12 @@ const makeCaja = (overrides = {}) => ({
     ...overrides,
 })
 
+const makePedidoCobrado = (items = [], cobradoAt = '2026-03-06T18:00:00Z') => ({
+    estado: 'cobrado',
+    cobradoAt: new Date(cobradoAt).toISOString(),
+    items,
+})
+
 /** Configura el mock de api.get para una caja abierta dada. */
 const mockApiSuccess = async (caja) => {
     const { default: api } = await import('../../utils/api')
@@ -93,7 +99,7 @@ describe('calcularResumen', () => {
         expect(result.totalTransferencia).toBe(300)
     })
 
-    it('computes total = montoInicial + totalEfectivo + totalTransferencia (sin restar egresos)', () => {
+    it('computes total = efectivoNeto + totalTransferencia - egresos.transferencia', () => {
         const caja = makeCaja({
             montoInicial: 500,
             totalEfectivo: 1000,
@@ -101,7 +107,8 @@ describe('calcularResumen', () => {
             egresos: [{ efectivo: 200, transferencia: 0 }],
         })
         const result = calcularResumen(caja, [], [])
-        expect(result.total).toBe(500 + 1000 + 300)
+        // efectivoNeto = 500+1000-200 = 1300; total = 1300+300-0 = 1600
+        expect(result.total).toBe(1600)
     })
 
     it('sums multiple egresos correctly', () => {
@@ -134,77 +141,202 @@ describe('calcularResumen', () => {
         expect(result.totalTransferencia).toBe(0)
         expect(result.total).toBe(0)
         expect(result.egresos.total).toBe(0)
-        expect(result.turnos.cantidad).toBe(0)
+        expect(result.turnosFutbol.cantidad).toBe(0)
+        expect(result.turnosPadel.cantidad).toBe(0)
+        expect(result.eventos.cantidad).toBe(0)
+        expect(result.kiosco.total).toBe(0)
     })
 
     it('counts only cobrado turnos within the caja time range', () => {
         const cajaCreatedAt = new Date('2026-03-06T10:00:00Z')
         const caja = makeCaja({ createdAt: cajaCreatedAt.toISOString() })
         const turnos = [
-            // Cobrado dentro del rango → debe contar
             { estado: 'cobrado', cobradoAt: new Date('2026-03-06T12:00:00Z').toISOString() },
-            // Cobrado ANTES de que se abriera la caja → no debe contar
             { estado: 'cobrado', cobradoAt: new Date('2026-03-06T09:00:00Z').toISOString() },
-            // Pendiente dentro del rango → no debe contar
             { estado: 'pendiente', cobradoAt: new Date('2026-03-06T11:00:00Z').toISOString() },
-            // Sin fecha → createdAt 0 (fuera de rango) → no debe contar
             { estado: 'cobrado' },
         ]
         const result = calcularResumen(caja, turnos, [])
-        expect(result.turnos.cantidad).toBe(1)
+        expect(result.turnosFutbol.cantidad).toBe(1)
     })
 
     it('counts "Turno Futbol" items from cobrado pedidos (case-insensitive)', () => {
-        const cajaCreatedAt = new Date('2026-03-06T08:00:00Z')
-        const caja = makeCaja({ createdAt: cajaCreatedAt.toISOString() })
+        const caja = makeCaja()
         const pedidos = [
-            {
-                estado: 'cobrado',
-                cobradoAt: new Date('2026-03-06T18:00:00Z').toISOString(),
-                items: [
-                    { nombre: 'Turno Futbol', cantidad: 2 },
-                    { nombre: 'TURNO FUTBOL', cantidad: 1 },
-                    { nombre: 'Milanesa', cantidad: 3 },
-                ],
-            },
+            makePedidoCobrado([
+                { nombre: 'Turno Futbol', cantidad: 2, precio: 5000 },
+                { nombre: 'TURNO FUTBOL', cantidad: 1, precio: 5000 },
+                { nombre: 'Milanesa', cantidad: 3, precio: 2000 },
+            ]),
         ]
         const result = calcularResumen(caja, [], pedidos)
-        expect(result.turnos.cantidad).toBe(3) // 2 + 1, no cuenta Milanesa
+        expect(result.turnosFutbol.cantidad).toBe(3)
+        expect(result.turnosFutbol.total).toBe(15000)
     })
 
     it('combines direct turnos and turno-futbol pedido items', () => {
-        const cajaCreatedAt = new Date('2026-03-06T08:00:00Z')
-        const caja = makeCaja({ createdAt: cajaCreatedAt.toISOString() })
+        const caja = makeCaja()
         const turnos = [
             { estado: 'cobrado', cobradoAt: new Date('2026-03-06T10:00:00Z').toISOString() },
         ]
         const pedidos = [
-            {
-                estado: 'cobrado',
-                cobradoAt: new Date('2026-03-06T11:00:00Z').toISOString(),
-                items: [{ nombre: 'Turno Futbol', cantidad: 2 }],
-            },
+            makePedidoCobrado([{ nombre: 'Turno Futbol', cantidad: 2, precio: 5000 }]),
         ]
         const result = calcularResumen(caja, turnos, pedidos)
-        expect(result.turnos.cantidad).toBe(3) // 1 directo + 2 de pedido
+        expect(result.turnosFutbol.cantidad).toBe(3)
     })
 
     it('uses cerradaAt as finCaja when caja is closed (no counts after close)', () => {
-        const cajaCreatedAt = new Date('2026-03-06T08:00:00Z')
         const cerradaAt = new Date('2026-03-06T14:00:00Z')
         const caja = makeCaja({
             cerrada: true,
-            createdAt: cajaCreatedAt.toISOString(),
             cerradaAt: cerradaAt.toISOString(),
         })
         const turnos = [
-            // Dentro del rango → cuenta
             { estado: 'cobrado', cobradoAt: new Date('2026-03-06T13:00:00Z').toISOString() },
-            // Después del cierre → NO debe contar
             { estado: 'cobrado', cobradoAt: new Date('2026-03-06T15:00:00Z').toISOString() },
         ]
         const result = calcularResumen(caja, turnos, [])
-        expect(result.turnos.cantidad).toBe(1)
+        expect(result.turnosFutbol.cantidad).toBe(1)
+    })
+
+    // ─── Turnos Pádel ────────────────────────────────────────────────────────
+
+    it('counts "Turno Pádel" items in turnosPadel card (with accent)', () => {
+        const caja = makeCaja()
+        const pedidos = [
+            makePedidoCobrado([
+                { nombre: 'Turno Pádel', cantidad: 3, precio: 6000 },
+            ]),
+        ]
+        const result = calcularResumen(caja, [], pedidos)
+        expect(result.turnosPadel.cantidad).toBe(3)
+        expect(result.turnosPadel.total).toBe(18000)
+    })
+
+    it('"Turno Pádel" is case-insensitive', () => {
+        const caja = makeCaja()
+        const pedidos = [
+            makePedidoCobrado([
+                { nombre: 'TURNO PÁDEL', cantidad: 1, precio: 6000 },
+                { nombre: 'turno pádel', cantidad: 2, precio: 6000 },
+            ]),
+        ]
+        const result = calcularResumen(caja, [], pedidos)
+        expect(result.turnosPadel.cantidad).toBe(3)
+    })
+
+    // ─── Eventos ─────────────────────────────────────────────────────────────
+
+    it('counts "Evento" items in eventos card', () => {
+        const caja = makeCaja()
+        const pedidos = [
+            makePedidoCobrado([
+                { nombre: 'Evento', cantidad: 2, precio: 10000 },
+            ]),
+        ]
+        const result = calcularResumen(caja, [], pedidos)
+        expect(result.eventos.cantidad).toBe(2)
+        expect(result.eventos.total).toBe(20000)
+    })
+
+    it('"Evento" is case-insensitive', () => {
+        const caja = makeCaja()
+        const pedidos = [
+            makePedidoCobrado([
+                { nombre: 'EVENTO', cantidad: 1, precio: 10000 },
+                { nombre: 'evento', cantidad: 1, precio: 10000 },
+            ]),
+        ]
+        const result = calcularResumen(caja, [], pedidos)
+        expect(result.eventos.cantidad).toBe(2)
+    })
+
+    // ─── Kiosco ──────────────────────────────────────────────────────────────
+
+    it('sums non-special items in kiosco', () => {
+        const caja = makeCaja()
+        const pedidos = [
+            makePedidoCobrado([
+                { nombre: 'Pizza', cantidad: 2, precio: 3000 },
+                { nombre: 'Cerveza', cantidad: 4, precio: 1500 },
+            ]),
+        ]
+        const result = calcularResumen(caja, [], pedidos)
+        expect(result.kiosco.total).toBe(12000)
+    })
+
+    it('kiosco includes non-special items even when pedido also has special items', () => {
+        const caja = makeCaja()
+        const pedidos = [
+            makePedidoCobrado([
+                { nombre: 'Turno Futbol', cantidad: 1, precio: 5000 },
+                { nombre: 'Pizza', cantidad: 2, precio: 3000 },
+                { nombre: 'Fernet', cantidad: 1, precio: 4000 },
+            ]),
+        ]
+        const result = calcularResumen(caja, [], pedidos)
+        expect(result.turnosFutbol.cantidad).toBe(1)
+        expect(result.turnosFutbol.total).toBe(5000)
+        expect(result.kiosco.total).toBe(10000) // 2*3000 + 1*4000
+    })
+
+    it('kiosco is zero when pedido only has special items', () => {
+        const caja = makeCaja()
+        const pedidos = [
+            makePedidoCobrado([
+                { nombre: 'Turno Futbol', cantidad: 1, precio: 5000 },
+                { nombre: 'Turno Pádel', cantidad: 1, precio: 6000 },
+                { nombre: 'Evento', cantidad: 1, precio: 10000 },
+            ]),
+        ]
+        const result = calcularResumen(caja, [], pedidos)
+        expect(result.kiosco.total).toBe(0)
+    })
+
+    // ─── Pedido mixto completo ───────────────────────────────────────────────
+
+    it('distributes a mixed pedido correctly across all cards', () => {
+        const caja = makeCaja()
+        const pedidos = [
+            makePedidoCobrado([
+                { nombre: 'Turno Futbol', cantidad: 1, precio: 5000 },
+                { nombre: 'Turno Pádel', cantidad: 2, precio: 6000 },
+                { nombre: 'Evento', cantidad: 1, precio: 10000 },
+                { nombre: 'Pizza', cantidad: 3, precio: 2000 },
+                { nombre: 'Cerveza', cantidad: 5, precio: 1500 },
+            ]),
+        ]
+        const result = calcularResumen(caja, [], pedidos)
+        expect(result.turnosFutbol.cantidad).toBe(1)
+        expect(result.turnosFutbol.total).toBe(5000)
+        expect(result.turnosPadel.cantidad).toBe(2)
+        expect(result.turnosPadel.total).toBe(12000)
+        expect(result.eventos.cantidad).toBe(1)
+        expect(result.eventos.total).toBe(10000)
+        expect(result.kiosco.total).toBe(13500) // 3*2000 + 5*1500
+    })
+
+    it('sums across multiple pedidos', () => {
+        const caja = makeCaja()
+        const pedidos = [
+            makePedidoCobrado([
+                { nombre: 'Pizza', cantidad: 1, precio: 3000 },
+                { nombre: 'Turno Futbol', cantidad: 1, precio: 5000 },
+            ]),
+            makePedidoCobrado([
+                { nombre: 'Cerveza', cantidad: 2, precio: 1500 },
+                { nombre: 'Turno Pádel', cantidad: 1, precio: 6000 },
+            ]),
+            makePedidoCobrado([
+                { nombre: 'Evento', cantidad: 1, precio: 10000 },
+            ]),
+        ]
+        const result = calcularResumen(caja, [], pedidos)
+        expect(result.turnosFutbol.cantidad).toBe(1)
+        expect(result.turnosPadel.cantidad).toBe(1)
+        expect(result.eventos.cantidad).toBe(1)
+        expect(result.kiosco.total).toBe(6000) // 3000 + 2*1500
     })
 })
 

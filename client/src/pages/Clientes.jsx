@@ -621,7 +621,16 @@ const Clientes = () => {
                         placeholder="Buscar cliente..."
                         className="input-field text-sm py-1.5 w-full sm:w-48"
                     />
-                    <button onClick={openNuevoPedidoModal} className="btn-primary w-full sm:w-auto">
+                    <button
+                        onClick={() => {
+                            if (!localStorage.getItem('cajaSeleccionadaId')) {
+                                alert('Debes abrir la caja antes de crear pedidos')
+                                return
+                            }
+                            openNuevoPedidoModal()
+                        }}
+                        className="btn-primary w-full sm:w-auto"
+                    >
                         + Nuevo Pedido
                     </button>
                     <button onClick={() => openEditModal()} className="btn-primary w-full sm:w-auto">

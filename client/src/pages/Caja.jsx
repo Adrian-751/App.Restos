@@ -47,7 +47,11 @@ export const calcularResumen = (cajaData, turnos = [], pedidos = []) => {
     })
     const cantidadTurnosDirectos = turnosEnRango.length
 
-    const TURNO_PRODUCTO_NOMBRE = 'turno futbol'
+    const TURNO_FUTBOL_NOMBRE = 'turno futbol'
+    const TURNO_PADEL_NOMBRE = 'turno pádel'
+    const EVENTO_NOMBRE = 'evento'
+    const NOMBRES_ESPECIALES = [TURNO_FUTBOL_NOMBRE, TURNO_PADEL_NOMBRE, EVENTO_NOMBRE]
+
     const pedidosArray = Array.isArray(pedidos) ? pedidos : []
     const pedidosEnRango = pedidosArray.filter((p) => {
         if (!p) return false
@@ -57,20 +61,39 @@ export const calcularResumen = (cajaData, turnos = [], pedidos = []) => {
         return fechaCobro >= inicioCaja && fechaCobro <= finCaja
     })
 
-    const turnosDesdePedidos = pedidosEnRango.reduce(
-        (acc, p) => {
-            const items = Array.isArray(p.items) ? p.items : []
-            for (const it of items) {
-                const nombre = String(it?.nombre || '').trim().toLowerCase()
-                if (nombre !== TURNO_PRODUCTO_NOMBRE) continue
-                acc.cantidad += Number(it?.cantidad || 0)
-            }
-            return acc
-        },
-        { cantidad: 0 }
-    )
+    const montoTurnosDirectos = turnosEnRango.reduce((acc, t) => acc + (Number(t.total) || 0), 0)
 
-    const cantidadTurnosFinal = cantidadTurnosDirectos + turnosDesdePedidos.cantidad
+    const reducirItemsPorNombre = (nombre) =>
+        pedidosEnRango.reduce(
+            (acc, p) => {
+                const items = Array.isArray(p.items) ? p.items : []
+                for (const it of items) {
+                    if (String(it?.nombre || '').trim().toLowerCase() !== nombre) continue
+                    const cant = Number(it?.cantidad || 0)
+                    acc.cantidad += cant
+                    acc.monto += Number(it?.precio || 0) * cant
+                }
+                return acc
+            },
+            { cantidad: 0, monto: 0 }
+        )
+
+    const turnosFutbolDesdePedidos = reducirItemsPorNombre(TURNO_FUTBOL_NOMBRE)
+    const turnosPadelDesdePedidos = reducirItemsPorNombre(TURNO_PADEL_NOMBRE)
+    const eventosDesdePedidos = reducirItemsPorNombre(EVENTO_NOMBRE)
+
+    const montoKiosco = pedidosEnRango.reduce((acc, p) => {
+        const items = Array.isArray(p.items) ? p.items : []
+        for (const it of items) {
+            const nombre = String(it?.nombre || '').trim().toLowerCase()
+            if (NOMBRES_ESPECIALES.includes(nombre)) continue
+            acc += Number(it?.precio || 0) * Number(it?.cantidad || 0)
+        }
+        return acc
+    }, 0)
+
+    const cantidadTurnosFutbolFinal = cantidadTurnosDirectos + turnosFutbolDesdePedidos.cantidad
+    const montoTurnosFutbolFinal = montoTurnosDirectos + turnosFutbolDesdePedidos.monto
 
     const montoInicial = cajaData.montoInicial || 0
     const efectivoNeto = montoInicial + totalEfectivo - egresosTotal.efectivo
@@ -80,8 +103,11 @@ export const calcularResumen = (cajaData, turnos = [], pedidos = []) => {
         totalTransferencia,
         totalMontoInicial: montoInicial,
         egresos: egresosTotal,
-        turnos: { cantidad: cantidadTurnosFinal, total: 0 },
-        total: montoInicial + totalEfectivo + totalTransferencia,
+        turnosFutbol: { cantidad: cantidadTurnosFutbolFinal, total: montoTurnosFutbolFinal },
+        turnosPadel: { cantidad: turnosPadelDesdePedidos.cantidad, total: turnosPadelDesdePedidos.monto },
+        eventos: { cantidad: eventosDesdePedidos.cantidad, total: eventosDesdePedidos.monto },
+        kiosco: { total: montoKiosco },
+        total: efectivoNeto + totalTransferencia - egresosTotal.transferencia,
     }
 }
 
@@ -667,6 +693,41 @@ const Caja = () => {
 
                     {resumen && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="card bg-gradient-to-br from-teal-600 to-teal-800">
+                                <p className="text-teal-200 text-sm mb-2">Kiosco</p>
+                                <p className="text-2xl sm:text-3xl font-bold text-white">
+                                    ${resumen.kiosco.total.toLocaleString()}
+                                </p>
+                            </div>
+                            <div className="card bg-gradient-to-br from-orange-600 to-orange-800">
+                                <p className="text-orange-200 text-sm mb-2">
+                                    Turnos Fútbol: <span className="text-white font-semibold">x{resumen.turnosFutbol.cantidad}</span>
+                                </p>
+                                <p className="text-2xl sm:text-3xl font-bold text-white">
+                                    ${resumen.turnosFutbol.total.toLocaleString()}
+                                </p>
+                            </div>
+                            <div className="card bg-gradient-to-br from-cyan-600 to-cyan-800">
+                                <p className="text-cyan-200 text-sm mb-2">
+                                    Turnos Pádel: <span className="text-white font-semibold">x{resumen.turnosPadel.cantidad}</span>
+                                </p>
+                                <p className="text-2xl sm:text-3xl font-bold text-white">
+                                    ${resumen.turnosPadel.total.toLocaleString()}
+                                </p>
+                            </div>
+                            <div className="card bg-gradient-to-br from-pink-600 to-pink-800">
+                                <p className="text-pink-200 text-sm mb-2">
+                                    Eventos: <span className="text-white font-semibold">x{resumen.eventos.cantidad}</span>
+                                </p>
+                                <p className="text-2xl sm:text-3xl font-bold text-white">
+                                    ${resumen.eventos.total.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {resumen && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div className="card bg-gradient-to-br from-blue-600 to-blue-800">
                                 <p className="text-blue-200 text-sm mb-2">Efectivo</p>
                                 <p className="text-2xl sm:text-3xl font-bold text-white">
@@ -690,21 +751,12 @@ const Caja = () => {
                                     </p>
                                 )}
                             </div>
-                            <div className="card bg-gradient-to-br from-orange-600 to-orange-800">
-                                <p className="text-orange-200 text-sm mb-2">Turnos</p>
+                            <div className="card bg-gradient-to-br from-fuxia-primary to-fuxia-dark">
+                                <p className="text-fuchsia-200 text-sm mb-2">Total</p>
                                 <p className="text-2xl sm:text-3xl font-bold text-white">
-                                    x{resumen.turnos.cantidad}
+                                    ${resumen.total.toLocaleString()}
                                 </p>
                             </div>
-                        </div>
-                    )}
-
-                    {resumen && (
-                        <div className="card bg-gradient-to-br from-fuxia-primary to-fuxia-dark">
-                            <p className="text-fuchsia-200 text-sm mb-2">Total</p>
-                            <p className="text-2xl sm:text-3xl font-bold text-white">
-                                ${resumen.total.toLocaleString()}
-                            </p>
                         </div>
                     )}
                 </div>

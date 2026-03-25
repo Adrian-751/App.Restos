@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import api from '../utils/api'
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
 import { toastError, toastInfo, toastSuccess } from '../utils/toast'
 import { useModalHotkeys } from '../hooks/useModalHotkeys'
 import ProductCombobox from '../components/ProductCombobox'
 import { getYMDArgentina } from '../utils/date'
+import { useWsSubscription } from '../hooks/useWsSubscription'
 
 const Mesas = () => {
     const [mesas, setMesas] = useState([])
@@ -14,6 +15,70 @@ const Mesas = () => {
     const [showModal, setShowModal] = useState(false)
     const [editingMesa, setEditingMesa] = useState(null)
     const [formData, setFormData] = useState({ numero: '', nombre: '', color: '#e11d48' })
+    const lastFetchRef = useRef(0)
+
+    const fetchMesas = useCallback(async () => {
+        try {
+            const res = await api.get('/mesas')
+            setMesas(res.data)
+        } catch (error) {
+            console.error('Error fetching mesas:', error)
+        }
+    }, [])
+
+    const fetchProductos = useCallback(async () => {
+        try {
+            const res = await api.get('/productos')
+            setProductos(res.data)
+        } catch (error) {
+            console.error('Error fetching productos:', error)
+        }
+    }, [])
+
+    const fetchClientes = useCallback(async () => {
+        try {
+            const res = await api.get('/clientes')
+            setClientes(res.data)
+        } catch (error) {
+            console.error('Error fetching clientes:', error)
+        }
+    }, [])
+
+    const fetchPedidos = useCallback(async () => {
+        try {
+            const fechaHoy = getYMDArgentina(new Date())
+            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
+            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
+            const fechaFiltro = fechaCajaSeleccionada || fechaHoy
+            const res = await api.get(`/pedidos?fecha=${encodeURIComponent(fechaFiltro)}`)
+            setPedidos(Array.isArray(res.data) ? res.data : [])
+            lastFetchRef.current = Date.now()
+        } catch (error) {
+            console.error('Error fetching pedidos:', error)
+        }
+    }, [])
+
+    const fetchPedidosDebounced = useCallback(() => {
+        if (Date.now() - lastFetchRef.current < 2000) return
+        fetchPedidos()
+    }, [fetchPedidos])
+
+    // WebSocket: refetch pedidos on real-time changes
+    useWsSubscription('pedido:', fetchPedidosDebounced)
+
+    // Visibility change: refetch everything when screen wakes up
+    useEffect(() => {
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                fetchMesas()
+                fetchPedidos()
+                fetchProductos()
+                fetchClientes()
+            }
+        }
+        document.addEventListener('visibilitychange', handleVisibility)
+        return () => document.removeEventListener('visibilitychange', handleVisibility)
+    }, [fetchMesas, fetchPedidos, fetchProductos, fetchClientes])
 
     useEffect(() => {
         fetchMesas()
@@ -21,18 +86,16 @@ const Mesas = () => {
         fetchClientes()
         fetchPedidos()
 
-        // Escuchar cambios en la caja seleccionada (localStorage)
         const handleStorageChange = (e) => {
             if (e.key === 'cajaSeleccionadaFecha' || e.key === null) {
-                fetchMesas() // Recargar mesas para actualizar los nombres según la fecha
+                fetchMesas()
                 fetchPedidos()
             }
         }
         window.addEventListener('storage', handleStorageChange)
 
-        // También escuchar eventos personalizados cuando se cambia la caja desde la misma pestaña
         const handleCajaChange = () => {
-            fetchMesas() // Recargar mesas para actualizar los nombres según la fecha
+            fetchMesas()
             fetchPedidos()
         }
         window.addEventListener('caja-seleccionada-cambiada', handleCajaChange)
@@ -41,51 +104,7 @@ const Mesas = () => {
             window.removeEventListener('storage', handleStorageChange)
             window.removeEventListener('caja-seleccionada-cambiada', handleCajaChange)
         }
-    }, [])
-
-    const fetchMesas = async () => {
-        try {
-            const res = await api.get('/mesas')
-            setMesas(res.data)
-        } catch (error) {
-            console.error('Error fetching mesas:', error)
-        }
-    }
-
-    const fetchProductos = async () => {
-        try {
-            const res = await api.get('/productos')
-            setProductos(res.data)
-        } catch (error) {
-            console.error('Error fetching productos:', error)
-        }
-    }
-
-    const fetchClientes = async () => {
-        try {
-            const res = await api.get('/clientes')
-            setClientes(res.data)
-        } catch (error) {
-            console.error('Error fetching clientes:', error)
-        }
-    }
-
-    const fetchPedidos = async () => {
-        try {
-            const fechaHoy = getYMDArgentina(new Date())
-            const fechaCajaSeleccionadaRaw = localStorage.getItem('cajaSeleccionadaFecha')
-            const fechaCajaSeleccionada = String(fechaCajaSeleccionadaRaw || '').trim() || null
-
-            // Determinar qué fecha usar para filtrar
-            const fechaFiltro = fechaCajaSeleccionada || fechaHoy
-
-            // Pedir solo la fecha que necesitamos (evita traer histórico completo)
-            const res = await api.get(`/pedidos?fecha=${encodeURIComponent(fechaFiltro)}`)
-            setPedidos(Array.isArray(res.data) ? res.data : [])
-        } catch (error) {
-            console.error('Error fetching pedidos:', error)
-        }
-    }
+    }, [fetchMesas, fetchProductos, fetchClientes, fetchPedidos])
 
     // Función para obtener el nombre de la mesa según la fecha de la caja seleccionada
     // Busca el nombre en nombresPorFecha de la mesa usando la fecha de la caja seleccionada

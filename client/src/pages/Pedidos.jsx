@@ -1,13 +1,27 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import api from '../utils/api'
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll'
 import { toastError, toastInfo, toastSuccess } from '../utils/toast'
 import { useModalHotkeys } from '../hooks/useModalHotkeys'
 import ProductCombobox from '../components/ProductCombobox'
 import { getYMDArgentina, moneyToCents } from '../utils/date'
+import { useWsSubscription } from '../hooks/useWsSubscription'
+
+const PEDIDOS_CACHE_KEY = 'pedidos_cache'
+
+function readPedidosCache() {
+    try {
+        const raw = localStorage.getItem(PEDIDOS_CACHE_KEY)
+        return raw ? JSON.parse(raw) : []
+    } catch { return [] }
+}
+
+function writePedidosCache(data) {
+    try { localStorage.setItem(PEDIDOS_CACHE_KEY, JSON.stringify(data)) } catch { /* quota */ }
+}
 
 const Pedidos = () => {
-    const [pedidos, setPedidos] = useState([])
+    const [pedidos, setPedidos] = useState(readPedidosCache)
     const [productos, setProductos] = useState([])
     const [mesas, setMesas] = useState([])
     const [clientes, setClientes] = useState([])
@@ -33,6 +47,7 @@ const Pedidos = () => {
         observaciones: '',
     })
     const [observacionesOriginales, setObservacionesOriginales] = useState('')
+    const lastFetchRef = useRef(0)
 
     useLockBodyScroll(!!showModal || !!showCobroModal)
 
@@ -42,13 +57,52 @@ const Pedidos = () => {
         return s.charAt(0).toUpperCase() + s.slice(1)
     }
 
+    const getFechaFiltroCaja = () => {
+        const raw = localStorage.getItem('cajaSeleccionadaFecha')
+        return String(raw || '').trim() || getYMDArgentina(new Date())
+    }
+
+    const fetchPedidos = useCallback(async () => {
+        try {
+            const fechaFiltro = getFechaFiltroCaja()
+            const res = await api.get(`/pedidos?pendientes=true&limit=5000&fecha=${encodeURIComponent(fechaFiltro)}`)
+            const data = Array.isArray(res.data) ? res.data : []
+            setPedidos(data)
+            writePedidosCache(data)
+            lastFetchRef.current = Date.now()
+        } catch (error) {
+            console.error('Error fetching pedidos:', error)
+        }
+    }, [])
+
+    const fetchPedidosDebounced = useCallback(() => {
+        if (Date.now() - lastFetchRef.current < 2000) return
+        fetchPedidos()
+    }, [fetchPedidos])
+
+    // WebSocket: refetch on any pedido mutation from other clients/tabs
+    useWsSubscription('pedido:', fetchPedidosDebounced)
+
+    // Visibility change: refetch everything when screen wakes up
+    useEffect(() => {
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                fetchPedidos()
+                fetchProductos()
+                fetchMesas()
+                fetchClientes()
+            }
+        }
+        document.addEventListener('visibilitychange', handleVisibility)
+        return () => document.removeEventListener('visibilitychange', handleVisibility)
+    }, [fetchPedidos])
+
     useEffect(() => {
         fetchPedidos()
         fetchProductos()
         fetchMesas()
         fetchClientes()
 
-        // Escuchar cambios en la caja seleccionada (localStorage)
         const handleStorageChange = (e) => {
             if (e.key === 'cajaSeleccionadaFecha' || e.key === null) {
                 fetchPedidos()
@@ -56,7 +110,6 @@ const Pedidos = () => {
         }
         window.addEventListener('storage', handleStorageChange)
 
-        // También escuchar eventos personalizados cuando se cambia la caja desde la misma pestaña
         const handleCajaChange = () => {
             fetchPedidos()
         }
@@ -66,23 +119,7 @@ const Pedidos = () => {
             window.removeEventListener('storage', handleStorageChange)
             window.removeEventListener('caja-seleccionada-cambiada', handleCajaChange)
         }
-    }, [])
-
-    const getFechaFiltroCaja = () => {
-        const raw = localStorage.getItem('cajaSeleccionadaFecha')
-        return String(raw || '').trim() || getYMDArgentina(new Date())
-    }
-
-    const fetchPedidos = async () => {
-        try {
-            const fechaFiltro = getFechaFiltroCaja()
-
-            const res = await api.get(`/pedidos?pendientes=true&limit=5000&fecha=${encodeURIComponent(fechaFiltro)}`)
-            setPedidos(Array.isArray(res.data) ? res.data : [])
-        } catch (error) {
-            console.error('Error fetching pedidos:', error)
-        }
-    }
+    }, [fetchPedidos])
 
     const fetchProductos = async () => {
         try {
@@ -482,7 +519,16 @@ const Pedidos = () => {
         <div className="space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-2xl sm:text-3xl font-bold text-white">Pedidos</h2>
-                <button onClick={() => openEditModal()} className="btn-primary w-full sm:w-auto">
+                <button
+                    onClick={() => {
+                        if (!localStorage.getItem('cajaSeleccionadaId')) {
+                            alert('Debes abrir la caja antes de crear pedidos')
+                            return
+                        }
+                        openEditModal()
+                    }}
+                    className="btn-primary w-full sm:w-auto"
+                >
                     + Nuevo Pedido
                 </button>
             </div>

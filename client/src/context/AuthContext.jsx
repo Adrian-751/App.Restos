@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import api from '../utils/api'
 import { clearAuth, getToken, getUser, saveToken, saveUser } from '../utils/auth'
+import { wsManager } from '../utils/wsManager'
 
 const AuthContext = createContext(null)
 
@@ -15,9 +16,11 @@ export const AuthProvider = ({ children }) => {
         if (nextUser) saveUser(nextUser)
         setToken(nextToken || null)
         setUser(nextUser || null)
+        if (nextToken) wsManager.connect()
     }
 
     const logout = () => {
+        wsManager.disconnect()
         clearAuth()
         setToken(null)
         setUser(null)

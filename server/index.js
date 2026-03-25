@@ -1,3 +1,4 @@
+import { createServer } from 'http';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -5,6 +6,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { tenantMiddleware } from './tenancy/tenant.js';
 import { attachTenantDb } from './tenancy/attachTenantDb.js';
 import { resolveTenant } from './tenancy/tenant.js';
+import { createWebSocketServer } from './ws.js';
 
 // Importar rutas
 import authRoutes from './routes/auth.js';
@@ -153,11 +155,15 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 
+const httpServer = createServer(app);
+createWebSocketServer(httpServer);
+
 const startServer = async () => {
     try {
-        app.listen(PORT, () => {
+        httpServer.listen(PORT, () => {
             console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
             console.log(`📊 Modo: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`🔌 WebSocket disponible en ws://localhost:${PORT}/ws`);
         });
     } catch (error) {
         console.error('❌ Error al iniciar servidor:', error);

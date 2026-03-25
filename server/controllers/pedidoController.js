@@ -1,5 +1,6 @@
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { formatDateYMD, getArgentinaOffset, getTimeHMS } from '../utils/date.js'
+import { broadcast } from '../ws.js'
 
 
 /* Obtener todos los pedidos
@@ -110,6 +111,7 @@ export const createPedido = asyncHandler(async (req, res) => {
 
     const pedido = await Pedido.create(pedidoData);
 
+    broadcast(req.tenant, 'pedido:created', { _id: pedido._id.toString() })
     res.status(201).json(pedido);
 });
 
@@ -252,6 +254,7 @@ export const updatePedido = asyncHandler(async (req, res) => {
         }
     }
 
+    broadcast(req.tenant, 'pedido:updated', { _id: pedido._id.toString() })
     res.json(pedido);
 });
 
@@ -318,5 +321,6 @@ export const deletePedido = asyncHandler(async (req, res) => {
     }
 
     await Pedido.findByIdAndDelete(req.params.id)
+    broadcast(req.tenant, 'pedido:deleted', { _id: req.params.id })
     res.json({ success: true });
 });
